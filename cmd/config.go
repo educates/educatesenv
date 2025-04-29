@@ -37,7 +37,10 @@ var configInitCmd = &cobra.Command{
   repository: educates-training-platform
   token: ""
 local:
-  folder: %s
+  dir: %s
+development:
+  enabled: false
+  binaryLocation: ""
 `, defaultBin)
 		if err := os.WriteFile(configPath, []byte(defaultConfig), 0o644); err != nil {
 			return fmt.Errorf("failed to write config file: %w", err)

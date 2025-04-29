@@ -11,7 +11,10 @@ import (
 	"golang.org/x/oauth2"
 )
 
-var skipPreReleases bool
+var (
+	showAll bool
+	recents bool
+)
 
 var listRemoteCmd = &cobra.Command{
 	Use:   "list-remote",
@@ -38,15 +41,13 @@ var listRemoteCmd = &cobra.Command{
 			for _, rel := range releases {
 				if rel.TagName != nil {
 					tag := *rel.TagName
-					if skipPreReleases {
-						if isPreRelease(tag) {
-							continue
-						}
+					if !showAll && isPreRelease(tag) {
+						continue
 					}
 					allVersions = append(allVersions, tag)
 				}
 			}
-			if resp.NextPage == 0 {
+			if resp.NextPage == 0 || (recents && len(allVersions) >= 10) {
 				break
 			}
 			page = resp.NextPage
@@ -58,6 +59,12 @@ var listRemoteCmd = &cobra.Command{
 		}
 
 		sort.Sort(sort.Reverse(sort.StringSlice(allVersions)))
+
+		// If recents flag is set, only show the first 10 versions
+		if recents && len(allVersions) > 10 {
+			allVersions = allVersions[:10]
+		}
+
 		for _, v := range allVersions {
 			fmt.Println(v)
 		}
@@ -72,6 +79,7 @@ func isPreRelease(tag string) bool {
 }
 
 func init() {
-	listRemoteCmd.Flags().BoolVar(&skipPreReleases, "skip-pre-releases", false, "Skip pre-release versions (alpha, beta, rc)")
+	listRemoteCmd.Flags().BoolVar(&showAll, "all", false, "Show all versions including pre-releases (alpha, beta, rc)")
+	listRemoteCmd.Flags().BoolVar(&recents, "recents", false, "Show only the 10 most recent versions")
 	rootCmd.AddCommand(listRemoteCmd)
 }

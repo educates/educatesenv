@@ -14,7 +14,7 @@ var uninstallCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		version := args[0]
-		binDir := Config.Local.Folder
+		binDir := Config.Local.Dir
 		binaryName := fmt.Sprintf("educates-%s", version)
 		binaryPath := filepath.Join(binDir, binaryName)
 		symlinkPath := filepath.Join(binDir, "educates")

@@ -24,7 +24,14 @@ A version manager for the `educates` binary, inspired by [tfenv](https://github.
    ```
 2. **Initialize configuration and folders:**
    ```sh
+   # Basic initialization
    ./educatesenv init
+   
+   # Initialize and download latest version
+   ./educatesenv init --download
+   
+   # Initialize, download latest version and force reinstall if exists
+   ./educatesenv init --download --overwrite
    ```
 3. **Add the bin directory to your PATH:**
    - On Linux/macOS:
@@ -60,9 +67,25 @@ All commands are run via the `educatesenv` binary:
 
 ### Install a version
 ```sh
+# Install a specific version
 educatesenv install <version>
+
+# Install and set as active version
+educatesenv install <version> --use
+
+# Force reinstall even if version exists
+educatesenv install <version> --force
+
+# Install latest version
+educatesenv install latest
+
+# Install latest version and set as active
+educatesenv install latest --use
+
+# Force reinstall latest version
+educatesenv install latest --force
 ```
-Downloads and installs the specified version of `educates` into the bin directory.
+Downloads and installs the specified version (or latest version) of `educates` into the bin directory. Use `--use` to automatically set it as the active version after installation. Use `--force` to reinstall even if the version already exists.
 
 ### List installed versions
 ```sh
@@ -90,9 +113,16 @@ Removes the specified version from the bin directory. If it was the active versi
 
 ### Initialize configuration and folders
 ```sh
+# Basic initialization
 educatesenv init
+
+# Initialize and download latest version
+educatesenv init --download
+
+# Initialize and force download latest version even if exists
+educatesenv init --download --overwrite
 ```
-Creates the default config and bin folders, and prints instructions for adding the bin folder to your PATH.
+Creates the default config and bin folders, and prints instructions for adding the bin folder to your PATH. Use `--download` to automatically download and set the latest version as active. Use `--overwrite` to force download even if the version already exists.
 
 ### Configuration management
 - View current config:
@@ -108,7 +138,7 @@ Creates the default config and bin folders, and prints instructions for adding t
 
 ## Configuration
 
-Configuration is managed via a YAML file at `$HOME/.educatesenv/config.yaml` (or as set by the `EDUCATES_LOCAL_FOLDER` env var). Example:
+Configuration is managed via a YAML file at `$HOME/.educatesenv/config.yaml` (or as set by the `EDUCATES_LOCAL_DIR` env var). Example:
 
 ```yaml
 github:
@@ -116,14 +146,19 @@ github:
   repository: educates-training-platform
   token: ""
 local:
-  folder: /home/youruser/.educatesenv/bin
+  dir: /home/youruser/.educatesenv/bin
+development:
+  enabled: false
+  binaryLocation: ""
 ```
 
 You can override any value with environment variables:
 - `EDUCATES_GITHUB_ORG`
 - `EDUCATES_GITHUB_REPOSITORY`
 - `EDUCATES_GITHUB_TOKEN`
-- `EDUCATES_LOCAL_FOLDER`
+- `EDUCATES_LOCAL_DIR`
+- `EDUCATES_DEVELOPMENT_ENABLED`
+- `EDUCATES_DEVELOPMENT_BINARY_LOCATION`
 
 ---
 
@@ -132,7 +167,9 @@ You can override any value with environment variables:
 - `EDUCATES_GITHUB_ORG`: GitHub org to find educates binaries (default: `educates`)
 - `EDUCATES_GITHUB_REPOSITORY`: GitHub repository (default: `educates-training-platform`)
 - `EDUCATES_GITHUB_TOKEN`: GitHub token for API access (optional, for higher rate limits)
-- `EDUCATES_LOCAL_FOLDER`: Where binaries are downloaded and stored (default: `$HOME/.educatesenv/bin`)
+- `EDUCATES_LOCAL_DIR`: Where binaries are downloaded and stored (default: `$HOME/.educatesenv/bin`)
+- `EDUCATES_DEVELOPMENT_ENABLED`: Enable development mode (default: `false`)
+- `EDUCATES_DEVELOPMENT_BINARY_LOCATION`: Path to development binary when in development mode
 
 ---
 
@@ -167,4 +204,4 @@ Contributions are welcome! Please open issues or pull requests.
 ## Credits
 
 - Inspired by [tfenv](https://github.com/tfutils/tfenv)
-- Uses [Cobra](https://github.com/spf13/cobra), [Viper](https://github.com/spf13/viper), and [go-github](https://github.com/google/go-github) 
+- Uses [Cobra](https://github.com/spf13/cobra), [Viper](https://github.com/spf13/viper), and [go-github](https://github.com/google/go-github)

@@ -14,7 +14,7 @@ var listCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List installed educates versions",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		binDir := Config.Local.Folder
+		binDir := Config.Local.Dir
 		files, err := os.ReadDir(binDir)
 		if err != nil {
 			return fmt.Errorf("error reading bin directory: %w", err)
@@ -44,9 +44,18 @@ var listCmd = &cobra.Command{
 		}
 		sort.Sort(sort.Reverse(sort.StringSlice(versions)))
 
-		if len(versions) == 0 {
+		if len(versions) == 0 && !Config.Development.Enabled {
 			fmt.Println("No educates versions installed.")
 			return nil
+		}
+
+		// If development mode is enabled, add the development version
+		if Config.Development.Enabled {
+			mark := " "
+			if Config.Development.BinaryLocation == active {
+				mark = "*"
+			}
+			fmt.Printf("%s develop (-> %s)\n", mark, Config.Development.BinaryLocation)
 		}
 
 		for _, ver := range versions {
