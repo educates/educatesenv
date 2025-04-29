@@ -1,0 +1,38 @@
+# See https://golangci-lint.run/usage/configuration/ for reference
+version: 2
+
+run:
+  go: '1.21.0'
+  timeout: 5m
+  modules-download-mode: readonly
+
+formatters:
+  enable:
+    - gofmt
+
+linters-settings:
+  gofmt:
+    simplify: true
+
+linters:
+  disable-all: true
+  enable:
+    - govet
+    - errcheck
+    - ineffassign
+    - misspell
+    - staticcheck
+    - unused
+    - whitespace
+
+issues:
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - gocyclo
+        - errcheck
+        - dupl
+        - gosec
+
+  max-issues-per-linter: 0
+  max-same-issues: 0 

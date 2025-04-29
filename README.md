@@ -8,7 +8,7 @@ A version manager for the `educates` binary, inspired by [tfenv](https://github.
 
 - macOS (amd64, arm64)
 - Linux (amd64, arm64)
-- Windows (amd64)
+- Windows (amd64) - *Support in progress*
 
 ---
 
@@ -173,31 +173,110 @@ You can override any value with environment variables:
 
 ---
 
+## Project Structure
+
+```
+educatesenv/
+├── cmd/
+│   └── educatesenv/      # Main entry point
+│       └── main.go
+├── pkg/
+│   ├── cmd/              # Command implementations
+│   │   └── root.go
+│   ├── config/           # Configuration management
+│   │   └── config.go
+│   ├── github/           # GitHub API interactions
+│   │   └── client.go
+│   └── version/          # Version management
+│       └── manager.go
+├── .github/              # GitHub Actions workflows
+├── Makefile             # Build automation
+├── go.mod               # Go module definition
+└── README.md            # This file
+```
+
 ## Development
 
-- All CLI logic is implemented using [Cobra](https://github.com/spf13/cobra) and [Viper](https://github.com/spf13/viper).
-- Commands are located in the `cmd/` directory.
-- To add new commands or functionality, edit or add files in `cmd/`.
+### Prerequisites
 
-### Building
+- Go 1.21 or later
+- Make
+- golangci-lint (for linting)
 
-Use the provided Makefile:
+### Building and Testing
+
 ```sh
+# Build the binary
 make build
+
+# Run tests
+make test
+
+# Run linter
+make lint
+
+# Install locally
+make install
 ```
-This will produce the `educatesenv` binary in the current directory.
+
+### Running Tests
+
+The project includes tests for core functionality:
+- Configuration management (`pkg/config`)
+- Platform detection (`pkg/platform`)
+- Version management (`pkg/version`)
+
+Run all tests with:
+```sh
+make test
+```
+
+### Code Quality
+
+We use golangci-lint for code quality checks. Run the linter with:
+```sh
+make lint
+```
+
+The configuration for golangci-lint is in `.golangci.yml`.
+
+### Project TODOs
+
+1. Platform Support:
+   - [ ] Complete Windows support including `.exe` extension handling
+   - [ ] Add tests for Windows-specific functionality
+
+2. Testing:
+   - [ ] Implement proper mocking for GitHub client in version manager tests
+   - [ ] Add tests for the `cmd` package
+   - [ ] Add tests for the `github` package
+   - [ ] Improve test coverage for error cases
+
+3. Features:
+   - [ ] Add version validation before installation
+   - [ ] Support for version ranges (e.g., ">=1.0.0")
+   - [ ] Add offline mode support
+
+4. Documentation:
+   - [ ] Add godoc comments for all exported functions
+   - [ ] Add examples in documentation
+   - [ ] Add contribution guidelines
+
+### Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
+
+Please make sure to:
+1. Update tests as appropriate
+2. Update documentation
+3. Follow the existing code style
+4. Run tests and linting before submitting
 
 ---
 
 ## License
 
 Apache License 2.0. See [LICENSE](LICENSE).
-
----
-
-## Contributing
-
-Contributions are welcome! Please open issues or pull requests.
 
 ---
 
