@@ -1,0 +1,17 @@
+{
+    "go.lintOnSave": "package",
+    "go.lintTool": "golangci-lint",
+    "go.lintFlags": [],
+    "go.formatTool": "gofmt",
+    "go.useLanguageServer": true,
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+        "source.fixAll": "explicit",
+        "source.organizeImports": "explicit"
+    },
+    "editor.defaultFormatter": "golang.go",
+    "[json]": {
+        "editor.defaultFormatter": "vscode.json-language-features"
+    },
+    
+}

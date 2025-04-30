@@ -38,7 +38,8 @@ func setupTestManager(t *testing.T) (*Manager, string, func()) {
 	manager := New(cfg, gh)
 
 	cleanup := func() {
-		os.RemoveAll(tmpDir)
+		err := os.RemoveAll(tmpDir)
+		assert.NoError(t, err)
 	}
 
 	return manager, tmpDir, cleanup
@@ -65,7 +66,9 @@ func TestValidateDevelopmentMode(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Test with development symlink
-	os.Remove(symlinkPath)
+	err = os.Remove(symlinkPath)
+	assert.NoError(t, err)
+
 	devBinaryPath := "/usr/local/bin/educates-dev"
 	err = os.Symlink(devBinaryPath, symlinkPath)
 	assert.NoError(t, err)

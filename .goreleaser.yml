@@ -1,0 +1,84 @@
+# This is an example .goreleaser.yml file with some sane defaults.
+# Make sure to check the documentation at http://goreleaser.com
+version: 2
+
+builds:
+  - main: ./cmd/educatesenv
+    id: educatesenv
+    binary: educatesenv-{{ .Os }}-{{ .Arch }}
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    flags:
+      - -trimpath
+    ldflags:
+      - -X github.com/educates/educatesenv/pkg/version.Version={{ .Version }}
+
+archives:
+  - format: binary
+
+checksum:
+  name_template: 'checksums.txt'
+  algorithm: sha256
+  disable: false
+
+snapshot:
+  name_template: "{{ .Tag }}-next"
+
+# Documentation: https://goreleaser.com/customization/release/#github
+release:
+  # Repo in which the release will be created.
+  github:
+    owner: educates
+    name: educatesenv
+
+  # If set to true, will not auto-publish the release.
+  draft: true
+
+  # You can disable this pipe in order to not upload any artifacts.
+  # Defaults to false.
+  disable: false
+
+  header: |
+    <details>
+
+    <summary><h2>Installation</h2></summary>
+
+    ### Installation
+    
+    #### By downloading binary from the release
+
+    For instance, if you are using Linux on an AMD64 architecture:
+    ```shell
+    # Download the binary
+    curl -LO https://github.com/{{ .Env.GITHUB_REPOSITORY }}/releases/download/{{ .Tag }}/{{ .ProjectName }}-linux-amd64
+
+    # Move the binary in to your PATH
+    mv educatesenv-linux-amd64 /usr/local/bin/educatesenv
+
+    # Make the binary executable
+    chmod +x /usr/local/bin/educatesenv
+    ```
+    </details>
+
+  footer: |
+      ## Thanks
+
+      And if you like this project, please give it a star or think about donating!
+
+changelog:
+  # Sorts the changelog by the commit's messages.
+  sort: asc
+
+  filters:
+    # Commit messages matching the regexp listed here will be removed from
+    # the changelog
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^typo:"

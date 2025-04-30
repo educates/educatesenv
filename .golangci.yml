@@ -1,14 +1,20 @@
 # See https://golangci-lint.run/usage/configuration/ for reference
+# or https://github.com/golangci/golangci-lint/blob/main/.golangci.reference.yml
 version: 2
 
 run:
-  go: '1.21.0'
+  go: '1.24'
   timeout: 5m
   modules-download-mode: readonly
+  relative-path-mode: gomod
 
 formatters:
   enable:
+#    - gci
     - gofmt
+#    - gofumpt
+    - goimports
+#    - golines
 
 linters-settings:
   gofmt:
