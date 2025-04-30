@@ -20,15 +20,13 @@ builds:
       - -X github.com/educates/educatesenv/pkg/version.Version={{ .Version }}
 
 archives:
-  - format: binary
+  - formats:
+      - binary
 
 checksum:
   name_template: 'checksums.txt'
   algorithm: sha256
   disable: false
-
-snapshot:
-  name_template: "{{ .Tag }}-next"
 
 # Documentation: https://goreleaser.com/customization/release/#github
 release:
@@ -37,8 +35,26 @@ release:
     owner: educates
     name: educatesenv
 
+  # If set to auto, will mark the release as not ready for production
+  # in case there is an indicator for this in the tag e.g. v1.0.0-rc1
+  # If set to true, will mark the release as not ready for production.
+  # Default: false.
+  prerelease: auto
+
   # If set to true, will not auto-publish the release.
-  draft: true
+  draft: false
+
+  # What to do with the release notes in case there the release already exists.
+  #
+  # Valid options are:
+  # - `keep-existing`: keep the existing notes
+  # - `append`: append the current release notes to the existing notes
+  # - `prepend`: prepend the current release notes to the existing notes
+  # - `replace`: replace existing notes
+  #
+  # Default: `keep-existing`.
+  mode: replace
+
 
   # You can disable this pipe in order to not upload any artifacts.
   # Defaults to false.
