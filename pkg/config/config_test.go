@@ -29,7 +29,10 @@ func TestLoad(t *testing.T) {
 	// Setup temporary directory for test config
 	tmpDir, err := os.MkdirTemp("", "educatesenv-test")
 	assert.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
+	defer func() {
+		err := os.RemoveAll(tmpDir)
+		assert.NoError(t, err)
+	}()
 
 	// Create a test config file
 	configContent := []byte(`
@@ -51,7 +54,10 @@ development:
 	assert.NoError(t, err)
 	err = os.Chdir(tmpDir)
 	assert.NoError(t, err)
-	defer os.Chdir(oldWd)
+	defer func() {
+		err := os.Chdir(oldWd)
+		assert.NoError(t, err)
+	}()
 
 	// Test loading config from file
 	cfg := New()
@@ -78,8 +84,12 @@ func TestLoadWithEnvVars(t *testing.T) {
 
 	// Set environment variables
 	for k, v := range envVars {
-		os.Setenv(k, v)
-		defer os.Unsetenv(k)
+		err := os.Setenv(k, v)
+		assert.NoError(t, err)
+		defer func() {
+			err := os.Unsetenv(k)
+			assert.NoError(t, err)
+		}()
 	}
 
 	// Test loading config with environment variables

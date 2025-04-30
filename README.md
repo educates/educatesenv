@@ -2,6 +2,147 @@
 
 A version manager for the `educates` binary, inspired by [tfenv](https://github.com/tfutils/tfenv). Easily install, switch, and manage multiple versions of the educates training platform binary.
 
+## Features
+
+- Version management for educates binary
+- Cross-platform support
+- Development mode for local testing
+- Automated releases with goreleaser
+
+## Installation
+
+### Using go install
+
+```bash
+go install github.com/educates/educatesenv/cmd/educatesenv@latest
+```
+
+### From releases
+
+Download the latest release from the [releases page](https://github.com/educates/educatesenv/releases).
+
+## Usage
+
+The `educatesenv` command provides several subcommands:
+
+```bash
+educatesenv version    # Display version information
+educatesenv install    # Install a specific version
+educatesenv use       # Switch to a specific version
+```
+
+## Development
+
+### Prerequisites
+
+- Go 1.21 or later
+- Make
+- [golangci-lint](https://golangci-lint.run/) for linting
+- [goreleaser](https://goreleaser.com/) for releases
+
+### Building and Testing
+
+```bash
+# Build the binary
+make build
+
+# Run tests
+make test
+
+# Run linter
+make lint
+
+# Local install
+make install
+
+# Test release build
+make release-test
+```
+
+### Code Quality
+
+We use golangci-lint for strict code quality enforcement. The configuration is in `.golangci.yml` and includes:
+
+- Advanced linters enabled
+- Strict formatting rules
+- Comprehensive static analysis
+
+Run the linter:
+```bash
+make lint
+```
+
+### GitHub Actions
+
+The project uses GitHub Actions for automated workflows:
+
+#### Build and Test Pipeline (`build.yml`)
+- Triggered on pull requests and pushes to main/develop branches
+- Matrix builds:
+  - Ubuntu and macOS
+  - amd64 and arm64 architectures (arm64 currently only on macOS)
+- Steps:
+  - Go 1.24 setup with dependency caching
+  - Unit tests execution
+  - Platform-specific binary builds
+  - Binary artifacts upload
+
+#### Linting Pipeline (`golangci-lint.yaml`)
+- Triggered on pushes to main/develop branches
+- Runs golangci-lint v2.1.5
+- Performs comprehensive code quality checks
+- Runs on Ubuntu latest
+
+#### Release Pipeline (`release.yml`)
+- Triggered on version tags (v*) or manual dispatch
+- Uses goreleaser for automated releases
+- Steps:
+  - Go 1.24 setup
+  - Creates GitHub releases
+  - Builds for all supported platforms
+  - Generates release artifacts
+
+The workflow configurations are in `.github/workflows/`:
+- `build.yml` - Build and test automation
+- `golangci-lint.yaml` - Code quality checks
+- `release.yml` - Release automation
+
+### Releases
+
+Releases are automated using goreleaser. The configuration is in `.goreleaser.yml` and handles:
+
+- Cross-platform builds
+- Checksums and signatures
+- GitHub release automation
+- Version information injection
+
+### Project Structure
+
+```
+.
+├── cmd/            # Command line interface
+├── pkg/            # Core packages
+│   ├── config/     # Configuration management
+│   ├── github/     # GitHub API integration
+│   ├── platform/   # Platform-specific code
+│   └── version/    # Version management
+├── .golangci.yml   # Linter configuration
+└── .goreleaser.yml # Release configuration
+```
+
+### Contributing
+
+Contributions are welcome! Please ensure you:
+
+1. Follow the code style enforced by golangci-lint
+2. Include tests for new functionality
+3. Update documentation as needed
+4. Run `make lint` and `make test` before submitting
+
+## License
+
+[Apache License 2.0](LICENSE)
+
 ---
 
 ## Supported OSes
@@ -109,178 +250,3 @@ Lists all available versions from the [educates GitHub releases](https://github.
 ```sh
 educatesenv uninstall <version>
 ```
-Removes the specified version from the bin directory. If it was the active version, the symlink is removed and you are prompted to select a new one.
-
-### Initialize configuration and folders
-```sh
-# Basic initialization
-educatesenv init
-
-# Initialize and download latest version
-educatesenv init --download
-
-# Initialize and force download latest version even if exists
-educatesenv init --download --overwrite
-```
-Creates the default config and bin folders, and prints instructions for adding the bin folder to your PATH. Use `--download` to automatically download and set the latest version as active. Use `--overwrite` to force download even if the version already exists.
-
-### Configuration management
-- View current config:
-  ```sh
-  educatesenv config view
-  ```
-- Generate a default config file:
-  ```sh
-  educatesenv config init
-  ```
-
----
-
-## Configuration
-
-Configuration is managed via a YAML file at `$HOME/.educatesenv/config.yaml` (or as set by the `EDUCATES_LOCAL_DIR` env var). Example:
-
-```yaml
-github:
-  org: educates
-  repository: educates-training-platform
-  token: ""
-local:
-  dir: /home/youruser/.educatesenv/bin
-development:
-  enabled: false
-  binaryLocation: ""
-```
-
-You can override any value with environment variables:
-- `EDUCATES_GITHUB_ORG`
-- `EDUCATES_GITHUB_REPOSITORY`
-- `EDUCATES_GITHUB_TOKEN`
-- `EDUCATES_LOCAL_DIR`
-- `EDUCATES_DEVELOPMENT_ENABLED`
-- `EDUCATES_DEVELOPMENT_BINARY_LOCATION`
-
----
-
-## Environment Variables
-
-- `EDUCATES_GITHUB_ORG`: GitHub org to find educates binaries (default: `educates`)
-- `EDUCATES_GITHUB_REPOSITORY`: GitHub repository (default: `educates-training-platform`)
-- `EDUCATES_GITHUB_TOKEN`: GitHub token for API access (optional, for higher rate limits)
-- `EDUCATES_LOCAL_DIR`: Where binaries are downloaded and stored (default: `$HOME/.educatesenv/bin`)
-- `EDUCATES_DEVELOPMENT_ENABLED`: Enable development mode (default: `false`)
-- `EDUCATES_DEVELOPMENT_BINARY_LOCATION`: Path to development binary when in development mode
-
----
-
-## Project Structure
-
-```
-educatesenv/
-├── cmd/
-│   └── educatesenv/      # Main entry point
-│       └── main.go
-├── pkg/
-│   ├── cmd/              # Command implementations
-│   │   └── root.go
-│   ├── config/           # Configuration management
-│   │   └── config.go
-│   ├── github/           # GitHub API interactions
-│   │   └── client.go
-│   └── version/          # Version management
-│       └── manager.go
-├── .github/              # GitHub Actions workflows
-├── Makefile             # Build automation
-├── go.mod               # Go module definition
-└── README.md            # This file
-```
-
-## Development
-
-### Prerequisites
-
-- Go 1.21 or later
-- Make
-- golangci-lint (for linting)
-
-### Building and Testing
-
-```sh
-# Build the binary
-make build
-
-# Run tests
-make test
-
-# Run linter
-make lint
-
-# Install locally
-make install
-```
-
-### Running Tests
-
-The project includes tests for core functionality:
-- Configuration management (`pkg/config`)
-- Platform detection (`pkg/platform`)
-- Version management (`pkg/version`)
-
-Run all tests with:
-```sh
-make test
-```
-
-### Code Quality
-
-We use golangci-lint for code quality checks. Run the linter with:
-```sh
-make lint
-```
-
-The configuration for golangci-lint is in `.golangci.yml`.
-
-### Project TODOs
-
-1. Platform Support:
-   - [ ] Complete Windows support including `.exe` extension handling
-   - [ ] Add tests for Windows-specific functionality
-
-2. Testing:
-   - [ ] Implement proper mocking for GitHub client in version manager tests
-   - [ ] Add tests for the `cmd` package
-   - [ ] Add tests for the `github` package
-   - [ ] Improve test coverage for error cases
-
-3. Features:
-   - [ ] Add version validation before installation
-   - [ ] Support for version ranges (e.g., ">=1.0.0")
-   - [ ] Add offline mode support
-
-4. Documentation:
-   - [ ] Add godoc comments for all exported functions
-   - [ ] Add examples in documentation
-   - [ ] Add contribution guidelines
-
-### Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
-
-Please make sure to:
-1. Update tests as appropriate
-2. Update documentation
-3. Follow the existing code style
-4. Run tests and linting before submitting
-
----
-
-## License
-
-Apache License 2.0. See [LICENSE](LICENSE).
-
----
-
-## Credits
-
-- Inspired by [tfenv](https://github.com/tfutils/tfenv)
-- Uses [Cobra](https://github.com/spf13/cobra), [Viper](https://github.com/spf13/viper), and [go-github](https://github.com/google/go-github)

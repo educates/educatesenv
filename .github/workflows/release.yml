@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
 
 jobs:
   release:
@@ -11,9 +12,14 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      # packages: write
+      # issues: write
+      # id-token: write
     
     steps:
     - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
 
     - name: Set up Go
       uses: actions/setup-go@v5
@@ -21,31 +27,11 @@ jobs:
         go-version: '1.24'
         cache: true
 
-    - name: Build Release Binaries
-      run: |
-        # Build for macOS (amd64 and arm64)
-        GOOS=darwin GOARCH=amd64 make build
-        mv bin/educatesenv bin/educates-darwin-amd64
-        GOOS=darwin GOARCH=arm64 make build
-        mv bin/educatesenv bin/educates-darwin-arm64
-        
-        # Build for Linux (amd64)
-        GOOS=linux GOARCH=amd64 make build
-        mv bin/educatesenv bin/educates-linux-amd64
-
-    - name: Generate Checksums
-      run: |
-        cd bin
-        sha256sum educates-* > checksums.txt
-
-    - name: Create Release
-      uses: softprops/action-gh-release@v1
+    - name: Run GoReleaser
+      uses: goreleaser/goreleaser-action@v6
       with:
-        files: |
-          bin/educates-darwin-amd64
-          bin/educates-darwin-arm64
-          bin/educates-linux-amd64
-          bin/checksums.txt
-        generate_release_notes: true
+        # 'latest', 'nightly', or a semver
+        version: "~> v2"
+        args: release --clean
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

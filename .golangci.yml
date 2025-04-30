@@ -1,24 +1,29 @@
 # See https://golangci-lint.run/usage/configuration/ for reference
-version: 2
+# or https://github.com/golangci/golangci-lint/blob/main/.golangci.reference.yml
+version: "2"
 
 run:
-  go: '1.21.0'
+  go: '1.24'
   timeout: 5m
   modules-download-mode: readonly
+  relative-path-mode: gomod
 
 formatters:
   enable:
     - gofmt
-
-linters-settings:
-  gofmt:
-    simplify: true
+    - goimports
+    - golines
+  settings:
+    gofmt:
+      simplify: true
+    golines:
+      max-len: 200
 
 linters:
-  disable-all: true
+  default: none
   enable:
-    - govet
     - errcheck
+    - govet
     - ineffassign
     - misspell
     - staticcheck
@@ -26,13 +31,5 @@ linters:
     - whitespace
 
 issues:
-  exclude-rules:
-    - path: _test\.go
-      linters:
-        - gocyclo
-        - errcheck
-        - dupl
-        - gosec
-
   max-issues-per-linter: 0
   max-same-issues: 0 
