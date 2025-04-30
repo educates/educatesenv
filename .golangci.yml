@@ -10,35 +10,27 @@ run:
 
 formatters:
   enable:
-#    - gci
     - gofmt
-#    - gofumpt
     - goimports
-#    - golines
-
-linters-settings:
-  gofmt:
-    simplify: true
+    - golines
+  settings:
+    golines:
+      max-len: 200
 
 linters:
-  disable-all: true
+  default: none
   enable:
-    - govet
     - errcheck
+    - govet
     - ineffassign
     - misspell
     - staticcheck
     - unused
     - whitespace
+  settings:
+    gofmt:
+      simplify: true
 
 issues:
-  exclude-rules:
-    - path: _test\.go
-      linters:
-        - gocyclo
-        - errcheck
-        - dupl
-        - gosec
-
   max-issues-per-linter: 0
   max-same-issues: 0 

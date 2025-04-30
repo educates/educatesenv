@@ -1,8 +1,18 @@
 {
     "go.lintOnSave": "package",
     "go.lintTool": "golangci-lint",
-    "go.lintFlags": [],
-    "go.formatTool": "gofmt",
+    "go.lintFlags": [
+        "--path-mode=abs",
+        "--fast-only"
+    ],
+    "go.formatTool": "custom",
+    "go.alternateTools": {
+    "customFormatter": "golangci-lint"
+    },
+    "go.formatFlags": [
+        "fmt",
+        "--stdin"
+    ],
     "go.useLanguageServer": true,
     "editor.formatOnSave": true,
     "editor.codeActionsOnSave": {
