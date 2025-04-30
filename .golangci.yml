@@ -1,6 +1,6 @@
 # See https://golangci-lint.run/usage/configuration/ for reference
 # or https://github.com/golangci/golangci-lint/blob/main/.golangci.reference.yml
-version: 2
+version: "2"
 
 run:
   go: '1.24'
@@ -14,6 +14,8 @@ formatters:
     - goimports
     - golines
   settings:
+    gofmt:
+      simplify: true
     golines:
       max-len: 200
 
@@ -27,9 +29,6 @@ linters:
     - staticcheck
     - unused
     - whitespace
-  settings:
-    gofmt:
-      simplify: true
 
 issues:
   max-issues-per-linter: 0
