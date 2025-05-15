@@ -5,6 +5,11 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Tag or version to build (e.g., v1.2.3). If not set, uses latest commit.'
+        required: false
+        default: ''
 
 jobs:
   release:
@@ -17,9 +22,10 @@ jobs:
       # id-token: write
     
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v4
       with:
-        fetch-depth: 0
+        ref: ${{ github.event.inputs.release_tag != '' && github.event.inputs.release_tag || github.sha }}
 
     - name: Set up Go
       uses: actions/setup-go@v5
