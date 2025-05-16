@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/viper"
+	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -127,4 +128,41 @@ func (c *Config) Load() error {
 	c.Development.BinaryLocation = viper.GetString("development.binaryLocation")
 
 	return nil
+}
+
+// CreateConfigAndFolders ensures the config and bin directories exist, and creates a default config.yaml if not present.
+// Returns (configDir, binDir, configPath, configCreated, error)
+func CreateConfigAndFolders() (string, string, string, bool, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		home = "."
+	}
+	configDir := filepath.Join(home, ConfigDirName)
+	binDir := filepath.Join(configDir, "bin")
+	configPath := filepath.Join(configDir, "config.yaml")
+
+	if err := os.MkdirAll(binDir, 0o755); err != nil {
+		return configDir, binDir, configPath, false, fmt.Errorf("failed to create bin directory: %w", err)
+	}
+	if err := os.MkdirAll(configDir, 0o755); err != nil {
+		return configDir, binDir, configPath, false, fmt.Errorf("failed to create config directory: %w", err)
+	}
+
+	configCreated := false
+	if _, err := os.Stat(configPath); err == nil {
+		// Config file already exists
+		configCreated = false
+	} else {
+		// Create new config with defaults
+		configFile := New()
+		yamlBytes, err := yaml.Marshal(&configFile)
+		if err != nil {
+			return configDir, binDir, configPath, false, fmt.Errorf("failed to marshal config to YAML: %w", err)
+		}
+		if err := os.WriteFile(configPath, yamlBytes, 0o644); err != nil {
+			return configDir, binDir, configPath, false, fmt.Errorf("failed to write config file: %w", err)
+		}
+		configCreated = true
+	}
+	return configDir, binDir, configPath, configCreated, nil
 }

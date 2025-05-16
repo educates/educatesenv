@@ -43,7 +43,7 @@ var useCmd = &cobra.Command{
 
 		// Handle regular version
 		if err := manager.UseVersion(version); err != nil {
-			return fmt.Errorf("failed to switch to version %s: %w", version, err)
+			return fmt.Errorf("Version %s is not installed. You should install it first with `educatesenv install %s`\n", version, version)
 		}
 
 		fmt.Printf("Now using educates version %s\n", version)

@@ -42,7 +42,8 @@ release:
   prerelease: auto
 
   # If set to true, will not auto-publish the release.
-  draft: false
+  # We wait so that we don't make the release public until we have notarize email from Apple.
+  draft: true
 
   # What to do with the release notes in case there the release already exists.
   #
