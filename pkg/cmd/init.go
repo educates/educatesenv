@@ -2,12 +2,9 @@ package cmd
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"runtime"
 
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
 
 	"github.com/educates/educatesenv/pkg/config"
 	"github.com/educates/educatesenv/pkg/platform"
@@ -24,35 +21,15 @@ var initCmd = &cobra.Command{
 	SilenceErrors: true,
 	SilenceUsage:  true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		home, err := os.UserHomeDir()
+		_, defaultBin, configPath, configCreated, err := config.CreateConfigAndFolders()
 		if err != nil {
-			home = "."
-		}
-		configDir := filepath.Join(home, config.ConfigDirName)
-		defaultBin := filepath.Join(configDir, "bin")
-		configPath := filepath.Join(configDir, "config.yaml")
-
-		if err := os.MkdirAll(defaultBin, 0o755); err != nil {
-			return fmt.Errorf("failed to create bin directory: %w", err)
-		}
-		if err := os.MkdirAll(configDir, 0o755); err != nil {
-			return fmt.Errorf("failed to create config directory: %w", err)
+			return err
 		}
 
-		if _, err := os.Stat(configPath); err == nil {
-			fmt.Printf("Config file already exists at %s\n", configPath)
-		} else {
-			// Create new config with defaults
-			configFile := config.New()
-
-			yamlBytes, err := yaml.Marshal(&configFile)
-			if err != nil {
-				return fmt.Errorf("failed to marshal config to YAML: %w", err)
-			}
-			if err := os.WriteFile(configPath, yamlBytes, 0o644); err != nil {
-				return fmt.Errorf("failed to write config file: %w", err)
-			}
+		if configCreated {
 			fmt.Printf("Config file created at %s\n", configPath)
+		} else {
+			fmt.Printf("Config file already exists at %s\n", configPath)
 		}
 		fmt.Printf("Bin directory ensured at %s\n", defaultBin)
 

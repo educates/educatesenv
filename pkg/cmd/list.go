@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/educates/educatesenv/pkg/config"
 	"github.com/spf13/cobra"
 )
 
@@ -17,8 +18,12 @@ var listCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Get all files in the bin directory
 		files, err := os.ReadDir(cfg.Local.Dir)
+		// If the bin directory doesn't exist call init
 		if err != nil {
-			return fmt.Errorf("failed to read bin directory: %w", err)
+			_, _, _, _, err := config.CreateConfigAndFolders()
+			if err != nil {
+				return fmt.Errorf("you should run `educatesenv init` first")
+			}
 		}
 
 		// Get the active version by reading the symlink

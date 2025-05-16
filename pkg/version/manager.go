@@ -88,7 +88,12 @@ func (m *Manager) UseVersion(version string) error {
 
 	// Handle regular version
 	binaryPath := filepath.Join(m.config.Local.Dir, fmt.Sprintf("%s%s", platform.BinaryPrefix, version))
-	return m.createSymlink(binaryPath, symlinkPath)
+	err := m.createSymlink(binaryPath, symlinkPath)
+	if err != nil {
+		return fmt.Errorf("%w", err)
+	}
+
+	return nil
 }
 
 // GetPlatformBinaryName returns the platform-specific binary name

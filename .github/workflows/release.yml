@@ -5,6 +5,11 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Tag or version to build (e.g., v1.2.3). If not set, uses latest commit.'
+        required: false
+        default: ''
 
 jobs:
   release:
@@ -17,9 +22,10 @@ jobs:
       # id-token: write
     
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v4
       with:
-        fetch-depth: 0
+        ref: ${{ github.event.inputs.release_tag != '' && github.event.inputs.release_tag || github.ref_type == 'tag' && github.ref_name || github.sha }}
 
     - name: Set up Go
       uses: actions/setup-go@v5
@@ -35,3 +41,16 @@ jobs:
         args: release --clean
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # The base64 of the contents of your '.p12' key.
+        MACOS_SIGN_P12: ${{ secrets.MACOS_SIGN_P12 }}
+        # The password to open the '.p12' key.
+        MACOS_SIGN_PASSWORD: ${{ secrets.MACOS_SIGN_PASSWORD }}
+        # The base64 of the contents of your '.p8' key.
+        MACOS_NOTARY_KEY: ${{ secrets.MACOS_NOTARY_KEY }}
+        # The ID of the '.p8' key.
+        # You can find it in the filename, as well as the Apple Developer Portal
+        # website.
+        MACOS_NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
+        # The issuer UUID.
+        # You can find it in the Apple Developer Portal website.
+        MACOS_NOTARY_ISSUER_ID: ${{ secrets.MACOS_NOTARY_ISSUER_ID }}        
