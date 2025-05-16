@@ -22,7 +22,7 @@ var listCmd = &cobra.Command{
 		if err != nil {
 			_, _, _, _, err := config.CreateConfigAndFolders()
 			if err != nil {
-				return fmt.Errorf("You should run `educatesenv init` first")
+				return fmt.Errorf("you should run `educatesenv init` first")
 			}
 		}
 
