@@ -6,21 +6,34 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/educates/educatesenv/pkg/config"
 	"github.com/educates/educatesenv/pkg/github"
 	"github.com/educates/educatesenv/pkg/platform"
 )
 
+// Timeouts of the HTTP client that downloads release assets. Each one bounds
+// a step that waits on the server before any of the body arrives. Nothing
+// bounds the whole transfer, so a slow download that keeps making progress
+// finishes.
+const (
+	connectTimeout        = 30 * time.Second
+	tlsHandshakeTimeout   = 10 * time.Second
+	responseHeaderTimeout = 30 * time.Second
+)
+
 // Manager handles version-related operations
 type Manager struct {
 	config *config.Config
 	github *github.Client
+	http   *http.Client
 	out    io.Writer
 	errOut io.Writer
 }
@@ -31,8 +44,24 @@ func New(cfg *config.Config, gh *github.Client, out, errOut io.Writer) *Manager 
 	return &Manager{
 		config: cfg,
 		github: gh,
+		http:   newDownloadClient(),
 		out:    out,
 		errOut: errOut,
+	}
+}
+
+// newDownloadClient returns the HTTP client that downloads release assets.
+// It times out on connecting, on the TLS handshake and on waiting for the
+// response headers, and sets no limit on the whole transfer.
+func newDownloadClient() *http.Client {
+	return &http.Client{
+		Transport: &http.Transport{
+			Proxy:                 http.ProxyFromEnvironment,
+			DialContext:           (&net.Dialer{Timeout: connectTimeout}).DialContext,
+			TLSHandshakeTimeout:   tlsHandshakeTimeout,
+			ResponseHeaderTimeout: responseHeaderTimeout,
+			ForceAttemptHTTP2:     true,
+		},
 	}
 }
 
@@ -287,7 +316,7 @@ func (m *Manager) installBinary(assetName, url, releasedSum, binaryPath string) 
 
 // download writes the body of a GET of url to w.
 func (m *Manager) download(url string, w io.Writer) error {
-	resp, err := http.Get(url)
+	resp, err := m.http.Get(url)
 	if err != nil {
 		return err
 	}
