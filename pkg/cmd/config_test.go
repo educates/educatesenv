@@ -253,25 +253,78 @@ func TestBooleansAcceptTheirUsualForms(t *testing.T) {
 	}
 }
 
+func TestBooleansInTheirUsualFormsGiveNoWarning(t *testing.T) {
+	env := clitest.New(t)
+	env.WriteConfig("development:\n  enabled: True\n")
+	env.Setenv("EDUCATES_DEVELOPMENT_ENABLED", "1")
+
+	res := env.Run("config", "view")
+
+	require.NoError(t, res.Err)
+	assert.Contains(t, res.Stdout, "    enabled: true\n")
+	assert.Empty(t, res.Stderr)
+}
+
+func TestABooleanInTheEnvironmentInAnotherFormIsReadAsFalseWithAWarning(t *testing.T) {
+	for _, value := range []string{"yes", "on", "y", "2", " true"} {
+		t.Run(value, func(t *testing.T) {
+			env := clitest.New(t)
+			env.WriteConfig("development:\n  enabled: true\n")
+			env.Setenv("EDUCATES_DEVELOPMENT_ENABLED", value)
+			warning := `Warning: EDUCATES_DEVELOPMENT_ENABLED is "` + value + `", which is not a boolean, so it is read as false. Set it to true or false.` + "\n"
+
+			res := env.Run("version")
+
+			require.NoError(t, res.Err)
+			assert.Equal(t, "develop\n", res.Stdout)
+			assert.Equal(t, warning, res.Stderr)
+
+			res = env.Run("config", "view")
+
+			require.NoError(t, res.Err)
+			assert.Contains(t, res.Stdout, "    enabled: false\n")
+			assert.Equal(t, warning, res.Stderr)
+		})
+	}
+}
+
+func TestABooleanInTheConfigFileInAnotherFormIsReadAsFalseWithAWarning(t *testing.T) {
+	tests := []struct {
+		value string
+		shown string
+	}{
+		{"yes", `is "yes", which is not a boolean`},
+		{"on", `is "on", which is not a boolean`},
+		{"Y", `is "Y", which is not a boolean`},
+		{`"yes"`, `is "yes", which is not a boolean`},
+		{`""`, `is "", which is not a boolean`},
+		{"2026-10-26", `is "2026-10-26", which is not a boolean`},
+		{"[true]", "is not a single value"},
+		{"{on: true}", "is not a single value"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.value, func(t *testing.T) {
+			env := clitest.New(t)
+			configPath := env.WriteConfig("development:\n  enabled: " + tt.value + "\n")
+			warning := "Warning: development.enabled in " + configPath + " " + tt.shown + ", so it is read as false. Set it to true or false.\n"
+
+			res := env.Run("version")
+
+			require.NoError(t, res.Err)
+			assert.Equal(t, "develop\n", res.Stdout)
+			assert.Equal(t, warning, res.Stderr)
+
+			res = env.Run("config", "view")
+
+			require.NoError(t, res.Err)
+			assert.Contains(t, res.Stdout, "    enabled: false\n")
+			assert.Equal(t, warning, res.Stderr)
+		})
+	}
+}
+
 func TestAMalformedValueIsAnError(t *testing.T) {
-	t.Run("a boolean in the environment", func(t *testing.T) {
-		env := clitest.New(t)
-		env.Setenv("EDUCATES_DEVELOPMENT_ENABLED", "yes")
-
-		res := env.Run("config", "view")
-
-		require.EqualError(t, res.Err, `EDUCATES_DEVELOPMENT_ENABLED: "yes" is not a boolean; use true or false`)
-	})
-
-	t.Run("a boolean in the config file", func(t *testing.T) {
-		env := clitest.New(t)
-		configPath := env.WriteConfig("development:\n  enabled: yes\n")
-
-		res := env.Run("config", "view")
-
-		require.EqualError(t, res.Err, `development.enabled in `+configPath+`: "yes" is not a boolean; use true or false`)
-	})
-
 	t.Run("a list in the config file", func(t *testing.T) {
 		env := clitest.New(t)
 		configPath := env.WriteConfig("github:\n  org: [acme, widgets]\n")

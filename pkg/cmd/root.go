@@ -41,13 +41,14 @@ type deps struct {
 	gh    *github.Client
 }
 
-// load reads the configuration and creates the version manager. Config
-// warnings and the manager's progress go to out, and the manager's
-// warnings and token warnings to errOut. It neither resolves the GitHub
-// token nor creates the GitHub client.
+// load reads the configuration and creates the version manager. The
+// warning about a missing home directory and the manager's progress go to
+// out, and warnings about config values, the manager's warnings and token
+// warnings to errOut. It neither resolves the GitHub token nor creates the
+// GitHub client.
 func (d *deps) load(out, errOut io.Writer) error {
 	var err error
-	d.cfg, err = config.Load(out)
+	d.cfg, err = config.Load(out, errOut)
 	if err != nil {
 		return err
 	}

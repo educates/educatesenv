@@ -308,8 +308,10 @@ empty one counts as not set:
 | `EDUCATES_DEVELOPMENT_BINARY_LOCATION` | `development.binaryLocation` |
 
 Booleans take `true` or `false`, and the other forms Go's
-`strconv.ParseBool` accepts, such as `1` and `0`. A value that is not a
-boolean is an error that names the variable or key.
+`strconv.ParseBool` accepts, such as `1` and `0`. In the config file, a
+number other than `0` is true as well. A value in any other form, such
+as `yes`, reads as false, and educatesenv prints a warning on stderr that
+names the key and file, or the variable.
 
 ### GitHub token
 
