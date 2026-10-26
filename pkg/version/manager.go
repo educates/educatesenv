@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"io/fs"
 	"net"
 	"net/http"
 	"os"
@@ -102,13 +103,17 @@ func (m *Manager) isDevSymlink(symlinkPath string) (bool, error) {
 		target = filepath.Join(filepath.Dir(symlinkPath), target)
 	}
 
-	// A symlink is considered a development symlink if:
-	// 1. Development mode is disabled AND
-	// 2. The target is outside the managed bin directory OR doesn't have the expected binary prefix
-	return !strings.HasPrefix(target, m.config.Local.Dir) || !strings.HasPrefix(filepath.Base(target), platform.BinaryPrefix), nil
+	// A symlink is a development symlink when its target is not directly
+	// in the managed bin directory, or lacks the binary prefix. The
+	// directories are compared as cleaned paths, so a sibling directory
+	// whose name starts with the bin directory's counts as outside.
+	// filepath.Dir returns a cleaned path.
+	inBinDir := filepath.Dir(target) == filepath.Clean(m.config.Local.Dir)
+	return !inBinDir || !strings.HasPrefix(filepath.Base(target), platform.BinaryPrefix), nil
 }
 
-// UseVersion sets a version as active
+// UseVersion sets a version as active. When the version's binary is
+// missing, the error wraps fs.ErrNotExist.
 func (m *Manager) UseVersion(version string) error {
 	symlinkPath := filepath.Join(m.config.Local.Dir, "educates")
 
@@ -203,7 +208,7 @@ func (m *Manager) createSymlink(source, target string) error {
 	// Check if source exists
 	if _, err := os.Stat(source); err != nil {
 		if os.IsNotExist(err) {
-			return fmt.Errorf("binary not found at %s", source)
+			return fmt.Errorf("binary not found at %s: %w", source, fs.ErrNotExist)
 		}
 		return fmt.Errorf("failed to check binary: %w", err)
 	}
