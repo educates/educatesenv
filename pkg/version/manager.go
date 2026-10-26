@@ -52,6 +52,23 @@ func New(cfg *config.Config, gh func() (*github.Client, error), out, errOut io.W
 	}
 }
 
+// Develop is the version name that stands for the development binary.
+const Develop = "develop"
+
+// activeLinkName is the name of the symlink in the bin directory that
+// points at the active version's binary, which then runs as educates.
+const activeLinkName = "educates"
+
+// activeLink returns the path of the educates symlink.
+func (m *Manager) activeLink() string {
+	return filepath.Join(m.config.Local.Dir, activeLinkName)
+}
+
+// binaryPath returns the path of the binary of the installed version.
+func (m *Manager) binaryPath(version string) string {
+	return filepath.Join(m.config.Local.Dir, platform.BinaryPrefix+version)
+}
+
 // newDownloadClient returns the HTTP client that downloads release assets.
 // It times out on connecting, on the TLS handshake and on waiting for the
 // response headers, and sets no limit on the whole transfer.
@@ -73,7 +90,7 @@ func (m *Manager) ValidateDevelopmentMode() error {
 		return nil
 	}
 
-	symlinkPath := filepath.Join(m.config.Local.Dir, "educates")
+	symlinkPath := m.activeLink()
 	isDev, err := m.isDevSymlink(symlinkPath)
 	if err != nil {
 		return fmt.Errorf("failed to validate development mode: %w", err)
@@ -116,10 +133,10 @@ func (m *Manager) isDevSymlink(symlinkPath string) (bool, error) {
 // UseVersion sets a version as active. When the version's binary is
 // missing, the error wraps fs.ErrNotExist.
 func (m *Manager) UseVersion(version string) error {
-	symlinkPath := filepath.Join(m.config.Local.Dir, "educates")
+	symlinkPath := m.activeLink()
 
 	// Handle development version
-	if version == "develop" {
+	if version == Develop {
 		if !m.config.Development.Enabled {
 			return fmt.Errorf("development mode is not enabled. Enable it in the config file by setting development.enabled to true")
 		}
@@ -130,7 +147,7 @@ func (m *Manager) UseVersion(version string) error {
 	}
 
 	// Handle regular version
-	binaryPath := filepath.Join(m.config.Local.Dir, fmt.Sprintf("%s%s", platform.BinaryPrefix, version))
+	binaryPath := m.binaryPath(version)
 	err := m.createSymlink(binaryPath, symlinkPath)
 	if err != nil {
 		return fmt.Errorf("%w", err)
@@ -168,7 +185,7 @@ func (m *Manager) InstallVersion(version string, force bool, activate bool) erro
 	}
 
 	// Check if version already exists
-	binaryPath := filepath.Join(binDir, fmt.Sprintf("%s%s", platform.BinaryPrefix, version))
+	binaryPath := m.binaryPath(version)
 	_, err := os.Stat(binaryPath)
 	versionExists := err == nil
 

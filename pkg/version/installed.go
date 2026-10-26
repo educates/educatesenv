@@ -2,7 +2,6 @@ package version
 
 import (
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/educates/educatesenv/pkg/platform"
@@ -10,9 +9,9 @@ import (
 
 // Installed returns the versions installed in the bin directory, in no
 // particular order, and the active one, the version the educates symlink
-// points at. The active version is one of versions, the development
-// binary's name develop when development mode is enabled and the symlink
-// points at that binary, or "" when no version is active. Installed fails
+// points at. The active version is one of versions, Develop when
+// development mode is enabled and the symlink points at the development
+// binary, or "" when no version is active. Installed fails
 // when the bin directory cannot be read; a missing bin directory gives an
 // error that wraps fs.ErrNotExist.
 func (m *Manager) Installed() (versions []string, active string, err error) {
@@ -21,7 +20,7 @@ func (m *Manager) Installed() (versions []string, active string, err error) {
 		return nil, "", err
 	}
 	for _, entry := range entries {
-		if entry.IsDir() || entry.Name() == "educates" {
+		if entry.IsDir() || entry.Name() == activeLinkName {
 			continue
 		}
 		if version, ok := strings.CutPrefix(entry.Name(), platform.BinaryPrefix); ok {
@@ -32,11 +31,11 @@ func (m *Manager) Installed() (versions []string, active string, err error) {
 }
 
 // activeVersion returns the version among installed whose binary the
-// educates symlink resolves to, or develop when development mode is
+// educates symlink resolves to, or Develop when development mode is
 // enabled and the symlink resolves to the development binary. It returns
 // "" when the symlink resolves to none of them, or does not resolve.
 func (m *Manager) activeVersion(installed []string) string {
-	active, err := os.Stat(filepath.Join(m.config.Local.Dir, "educates"))
+	active, err := os.Stat(m.activeLink())
 	if err != nil {
 		return ""
 	}
@@ -46,12 +45,12 @@ func (m *Manager) activeVersion(installed []string) string {
 	}
 
 	for _, version := range installed {
-		if isActive(filepath.Join(m.config.Local.Dir, platform.BinaryPrefix+version)) {
+		if isActive(m.binaryPath(version)) {
 			return version
 		}
 	}
 	if m.config.Development.Enabled && m.config.Development.BinaryLocation != "" && isActive(m.config.Development.BinaryLocation) {
-		return "develop"
+		return Develop
 	}
 	return ""
 }

@@ -5,6 +5,7 @@ import (
 
 	"github.com/educates/educatesenv/pkg/config"
 	"github.com/educates/educatesenv/pkg/releases"
+	"github.com/educates/educatesenv/pkg/version"
 	"github.com/spf13/cobra"
 )
 
@@ -40,7 +41,7 @@ func runList(d *deps) func(cmd *cobra.Command, args []string) error {
 
 		// Show development version if enabled
 		if cfg.Development.Enabled {
-			if activeVersion == "develop" {
+			if activeVersion == version.Develop {
 				_, _ = fmt.Fprintf(out, "* develop (active) -> %s\n", cfg.Development.BinaryLocation)
 			} else {
 				_, _ = fmt.Fprintf(out, "  develop -> %s\n", cfg.Development.BinaryLocation)
@@ -48,11 +49,11 @@ func runList(d *deps) func(cmd *cobra.Command, args []string) error {
 		}
 
 		// Print regular versions, newest first
-		for _, version := range releases.SortInstalled(versions) {
-			if version == activeVersion {
-				_, _ = fmt.Fprintf(out, "* %s (active)\n", version)
+		for _, name := range releases.SortInstalled(versions) {
+			if name == activeVersion {
+				_, _ = fmt.Fprintf(out, "* %s (active)\n", name)
 			} else {
-				_, _ = fmt.Fprintf(out, "  %s\n", version)
+				_, _ = fmt.Fprintf(out, "  %s\n", name)
 			}
 		}
 

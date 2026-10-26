@@ -23,7 +23,7 @@ func newUseCommand(d *deps) *cobra.Command {
 			name := args[0]
 
 			// Handle development version
-			if name == "develop" {
+			if name == version.Develop {
 				if !d.cfg.Development.Enabled {
 					return fmt.Errorf("development mode is not enabled. Enable it in the config file by setting development.enabled to true")
 				}
