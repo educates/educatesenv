@@ -3,6 +3,7 @@ package cmd_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -43,6 +44,21 @@ func TestInitWritesTheDefaultConfigReadableOnlyByItsOwner(t *testing.T) {
 
 	require.NoError(t, res.Err)
 	assertDefaultConfig(t, env)
+}
+
+func TestCreatingTheConfigWithoutAHomeDirectoryFails(t *testing.T) {
+	for _, args := range [][]string{{"init"}, {"config", "init"}} {
+		t.Run(strings.Join(args, " "), func(t *testing.T) {
+			env := clitest.New(t)
+			env.Unsetenv("HOME")
+
+			res := env.Run(args...)
+
+			require.Error(t, res.Err)
+			assert.Contains(t, res.Err.Error(), "could not determine home directory")
+			assert.NoDirExists(t, filepath.Join(env.WorkDir, ".educatesenv"))
+		})
+	}
 }
 
 func TestInitCreatesTheConfigAndBinDirectory(t *testing.T) {

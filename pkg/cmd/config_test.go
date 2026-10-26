@@ -299,7 +299,7 @@ func TestRequestsCarryTheTokenFromTheEnvironmentOrTheConfigFile(t *testing.T) {
 	}
 }
 
-func TestConfigInitCreatesTheConfigFile(t *testing.T) {
+func TestConfigInitCreatesTheSameConfigAsInit(t *testing.T) {
 	env := clitest.New(t)
 	configPath := filepath.Join(env.ConfigDir(), "config.yaml")
 
@@ -307,7 +307,7 @@ func TestConfigInitCreatesTheConfigFile(t *testing.T) {
 
 	require.NoError(t, res.Err)
 	assert.Equal(t, "Config file created at "+configPath+"\n", res.Stdout)
-	assert.FileExists(t, configPath)
+	assertDefaultConfig(t, env)
 }
 
 func TestConfigInitRefusesToReplaceAnExistingConfig(t *testing.T) {
