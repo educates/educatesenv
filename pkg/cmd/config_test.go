@@ -43,6 +43,24 @@ func TestConfigViewShowsTheDefaultsWithoutAConfigFile(t *testing.T) {
 	assert.Contains(t, out, "    binaryLocation: \"\"\n")
 }
 
+func TestAConfigFileWithoutValuesLeavesTheDefaults(t *testing.T) {
+	for name, content := range map[string]string{
+		"empty":            "",
+		"comments only":    "# educatesenv\n",
+		"an empty section": "github:\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			env := clitest.New(t)
+			env.WriteConfig(content)
+
+			out := configView(t, env)
+
+			assert.Contains(t, out, "    org: educates\n")
+			assert.Contains(t, out, "    dir: "+env.BinDir()+"\n")
+		})
+	}
+}
+
 func TestEachRunReadsTheConfigAfresh(t *testing.T) {
 	env := clitest.New(t)
 	configPath := env.WriteConfig("github:\n  org: acme\n")
