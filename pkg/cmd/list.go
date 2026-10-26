@@ -14,6 +14,7 @@ func newListCommand(d *deps) *cobra.Command {
 	return &cobra.Command{
 		Use:           "list",
 		Short:         "List installed educates versions",
+		Args:          cobra.NoArgs,
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		RunE:          runList(d),

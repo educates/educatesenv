@@ -11,7 +11,7 @@ func newVersionCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:           "version",
 		Short:         "Print client version",
-		Args:          cobra.ExactArgs(0),
+		Args:          cobra.NoArgs,
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		RunE: func(cmd *cobra.Command, _ []string) error {

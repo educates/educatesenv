@@ -19,6 +19,7 @@ func newInitCommand(d *deps) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "init",
 		Short:         "Initialize educatesenv: create default config and folders, and show PATH instructions",
+		Args:          cobra.NoArgs,
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		RunE: func(cmd *cobra.Command, args []string) error {

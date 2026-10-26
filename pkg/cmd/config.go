@@ -26,6 +26,7 @@ func newConfigInitCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "init",
 		Short: "Generate a default config file",
+		Args:  cobra.NoArgs,
 		// Disable the automatic error printing
 		SilenceErrors: true,
 		// Disable automatic usage printing on error
@@ -71,6 +72,7 @@ func newConfigViewCommand(d *deps) *cobra.Command {
 	return &cobra.Command{
 		Use:           "view",
 		Short:         "Show the current configuration",
+		Args:          cobra.NoArgs,
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		RunE: func(cmd *cobra.Command, args []string) error {

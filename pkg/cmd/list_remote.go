@@ -32,6 +32,7 @@ func newListRemoteCommand(d *deps) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "list-remote",
 		Short:         "List all available versions from GitHub releases",
+		Args:          cobra.NoArgs,
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		RunE: func(cmd *cobra.Command, args []string) error {

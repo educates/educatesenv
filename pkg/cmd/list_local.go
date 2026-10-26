@@ -9,6 +9,7 @@ func newListLocalCommand(d *deps) *cobra.Command {
 		Use:           "list-local",
 		Short:         "List installed educates versions (alias for list)",
 		Hidden:        true,
+		Args:          cobra.NoArgs,
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		RunE:          runList(d),
