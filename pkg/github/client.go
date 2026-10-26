@@ -6,7 +6,6 @@ import (
 
 	"github.com/educates/educatesenv/pkg/config"
 	"github.com/google/go-github/v93/github"
-	"golang.org/x/oauth2"
 )
 
 // Client wraps the GitHub client with our configuration
@@ -39,8 +38,7 @@ func New(cfg *config.Config, opts ...Option) (*Client, error) {
 
 	var clientOpts []github.ClientOptionsFunc
 	if cfg.Github.Token != "" {
-		ts := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: cfg.Github.Token})
-		clientOpts = append(clientOpts, github.WithHTTPClient(oauth2.NewClient(context.Background(), ts)))
+		clientOpts = append(clientOpts, github.WithAuthToken(cfg.Github.Token))
 	}
 	if o.baseURL != "" {
 		clientOpts = append(clientOpts, github.WithURLs(&o.baseURL, nil))
