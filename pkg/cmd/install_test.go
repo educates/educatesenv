@@ -98,3 +98,47 @@ func TestInstallCutMidTransferLeavesNothingBehindAndARetryInstalls(t *testing.T)
 	assert.Equal(t, "educates 3.8.0 binary", string(content))
 	assert.Equal(t, []string{"educates-3.8.0"}, binDirEntries(t, env))
 }
+
+// releasedSum is the SHA-256 checksum of "educates 3.8.0 binary".
+const releasedSum = "21163080cb987ff30bc789604b421676c7065e47b4c77415af76459db9bfc4bd"
+
+// addTamperedRelease adds a release whose binary is not the one its
+// checksums.txt lists.
+func addTamperedRelease(env *clitest.Env, tag string) {
+	env.GitHub.AddReleases(fakegithub.Release{Tag: tag, Assets: []fakegithub.Asset{
+		clitest.PlatformBinary([]byte("tampered binary")),
+		{Name: "checksums.txt", Content: []byte(releasedSum + "  " + clitest.PlatformBinaryName() + "\n")},
+	}})
+}
+
+func TestInstallFailsOnAChecksumMismatchAndLeavesNothingBehind(t *testing.T) {
+	env := clitest.New(t)
+	addTamperedRelease(env, "3.8.0")
+
+	res := env.Run("install", "3.8.0", "--use")
+
+	require.Error(t, res.Err)
+	assert.Contains(t, res.Err.Error(), "failed to install version 3.8.0: checksum mismatch for "+clitest.PlatformBinaryName())
+	assert.NotContains(t, res.Stdout, "installed successfully")
+	assert.Empty(t, binDirEntries(t, env))
+}
+
+func TestInstallOverwriteWithAChecksumMismatchKeepsTheInstalledBinary(t *testing.T) {
+	env := clitest.New(t)
+	installed := env.WriteBinary("3.8.0")
+	require.NoError(t, os.Symlink("educates-3.8.0", env.ActiveLink()))
+	addTamperedRelease(env, "3.8.0")
+
+	res := env.Run("install", "3.8.0", "--overwrite")
+
+	require.Error(t, res.Err)
+	assert.Contains(t, res.Err.Error(), "checksum mismatch for "+clitest.PlatformBinaryName())
+	assert.Contains(t, res.Stdout, "Reinstalling version 3.8.0...\n")
+	content, err := os.ReadFile(installed)
+	require.NoError(t, err)
+	assert.Equal(t, "educates 3.8.0", string(content))
+	info, err := os.Stat(installed)
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o755), info.Mode().Perm())
+	assert.ElementsMatch(t, []string{"educates", "educates-3.8.0"}, binDirEntries(t, env))
+}

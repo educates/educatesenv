@@ -1,6 +1,9 @@
 package version
 
 import (
+	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"net/http"
@@ -136,12 +139,17 @@ func (m *Manager) InstallVersion(version string, force bool, activate bool) erro
 			return fmt.Errorf("failed to determine platform binary name: %w", err)
 		}
 
-		downloadURL, err := m.github.GetReleaseAssetURL(version, assetName)
+		assets, err := m.github.GetReleaseAssets(version, assetName)
 		if err != nil {
 			return err // Pass through the user-friendly error from GitHub client
 		}
 
-		if err := m.installBinary(downloadURL, binaryPath); err != nil {
+		releasedSum, err := m.releasedChecksum(assetName, assets.ChecksumsURL)
+		if err != nil {
+			return err
+		}
+
+		if err := m.installBinary(assetName, assets.BinaryURL, releasedSum, binaryPath); err != nil {
 			return err
 		}
 		_, _ = fmt.Fprintf(m.out, "educates %s installed successfully.\n", version)
@@ -193,12 +201,41 @@ func (m *Manager) createSymlink(source, target string) error {
 	return nil
 }
 
-// installBinary downloads the binary at url into a temporary file next to
-// binaryPath, makes it executable and only then renames it to binaryPath,
-// replacing any binary already there. The temporary file is removed when
-// any step fails, so binaryPath holds either the previous binary or the
-// complete new one.
-func (m *Manager) installBinary(url, binaryPath string) (err error) {
+// releasedChecksum returns the SHA-256 checksum that the release's
+// checksums.txt lists for assetName. It returns "" when the release has no
+// checksums.txt.
+func (m *Manager) releasedChecksum(assetName, checksumsURL string) (string, error) {
+	if checksumsURL == "" {
+		return "", nil
+	}
+
+	var checksums bytes.Buffer
+	if err := m.download(checksumsURL, &checksums); err != nil {
+		return "", fmt.Errorf("failed to download %s (check your internet connection and try again): %w", github.ChecksumsAssetName, err)
+	}
+	sum, _ := findChecksum(checksums.String(), assetName)
+	return sum, nil
+}
+
+// findChecksum returns the checksum that checksums, in the format sha256sum
+// writes, lists for name.
+func findChecksum(checksums, name string) (string, bool) {
+	for line := range strings.Lines(checksums) {
+		fields := strings.Fields(line)
+		if len(fields) == 2 && strings.TrimPrefix(fields[1], "*") == name {
+			return strings.ToLower(fields[0]), true
+		}
+	}
+	return "", false
+}
+
+// installBinary downloads the binary assetName from url into a temporary
+// file next to binaryPath, checks its SHA-256 checksum against releasedSum
+// unless releasedSum is empty, makes it executable and only then renames it
+// to binaryPath, replacing any binary already there. The temporary file is
+// removed when any step fails, so binaryPath holds either the previous
+// binary or the complete, verified new one.
+func (m *Manager) installBinary(assetName, url, releasedSum, binaryPath string) (err error) {
 	dir := filepath.Dir(binaryPath)
 	// The leading dot keeps the temporary file out of the installed versions.
 	tmp, err := os.CreateTemp(dir, "."+filepath.Base(binaryPath)+"-*.download")
@@ -213,8 +250,15 @@ func (m *Manager) installBinary(url, binaryPath string) (err error) {
 	}()
 
 	_, _ = fmt.Fprintf(m.out, "Downloading %s...\n", url)
-	if err := m.download(url, tmp); err != nil {
+	hash := sha256.New()
+	if err := m.download(url, io.MultiWriter(tmp, hash)); err != nil {
 		return fmt.Errorf("failed to download binary (check your internet connection and try again): %w", err)
+	}
+
+	if releasedSum != "" {
+		if sum := hex.EncodeToString(hash.Sum(nil)); sum != releasedSum {
+			return fmt.Errorf("checksum mismatch for %s: %s lists %s, but the download has %s", assetName, github.ChecksumsAssetName, releasedSum, sum)
+		}
 	}
 
 	if err := tmp.Chmod(0o755); err != nil {
@@ -241,7 +285,7 @@ func (m *Manager) download(url string, w io.Writer) error {
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("failed to download %s: %s", url, resp.Status)
+		return fmt.Errorf("GET %s: %s", url, resp.Status)
 	}
 
 	_, err = io.Copy(w, resp.Body)
