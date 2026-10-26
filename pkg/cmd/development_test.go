@@ -3,6 +3,7 @@ package cmd_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -19,6 +20,66 @@ func writeDevelopmentBinary(t *testing.T, env *clitest.Env) string {
 	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
 	require.NoError(t, os.WriteFile(path, []byte("educates develop"), 0o755))
 	return path
+}
+
+// linkDevelopmentBinary writes a development binary and points the
+// educates symlink at it, and returns the binary's path.
+func linkDevelopmentBinary(t *testing.T, env *clitest.Env) string {
+	t.Helper()
+	devBinary := writeDevelopmentBinary(t, env)
+	require.NoError(t, os.MkdirAll(env.BinDir(), 0o755))
+	require.NoError(t, os.Symlink(devBinary, env.ActiveLink()))
+	return devBinary
+}
+
+func TestCommandsThatDealWithTheActiveBinaryRemoveTheDevelopmentSymlink(t *testing.T) {
+	tests := [][]string{
+		{"list"},
+		{"list-local"},
+		{"use", "3.8.0"},
+		{"install", "3.8.0"},
+		{"init"},
+	}
+
+	for _, command := range tests {
+		t.Run(strings.Join(command, " "), func(t *testing.T) {
+			env := clitest.New(t)
+			env.WriteBinary("3.8.0")
+			devBinary := linkDevelopmentBinary(t, env)
+
+			res := env.Run(command...)
+
+			require.NoError(t, res.Err)
+			assert.Contains(t, res.Stdout, "Warning: development mode is disabled; removed symlink to development binary.")
+			target, _ := os.Readlink(env.ActiveLink())
+			assert.NotEqual(t, devBinary, target)
+			assert.FileExists(t, devBinary)
+		})
+	}
+}
+
+func TestOtherCommandsKeepTheDevelopmentSymlink(t *testing.T) {
+	tests := [][]string{
+		{"version"},
+		{"config", "view"},
+		{"config", "init"},
+		{"list-remote"},
+	}
+
+	for _, command := range tests {
+		t.Run(strings.Join(command, " "), func(t *testing.T) {
+			env := clitest.New(t)
+			devBinary := linkDevelopmentBinary(t, env)
+
+			res := env.Run(command...)
+
+			require.NoError(t, res.Err)
+			assert.NotContains(t, res.Stdout, "development mode is disabled")
+			target, err := os.Readlink(env.ActiveLink())
+			require.NoError(t, err)
+			assert.Equal(t, devBinary, target)
+		})
+	}
 }
 
 func TestDisabledDevelopmentModeRemovesTheDevelopmentSymlink(t *testing.T) {

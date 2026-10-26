@@ -14,6 +14,7 @@ func newUseCommand(d *deps) *cobra.Command {
 		Args:          cobra.ExactArgs(1),
 		SilenceErrors: true,
 		SilenceUsage:  true,
+		PreRun:        d.cleanUpDevelopmentSymlink,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			version := args[0]
 
