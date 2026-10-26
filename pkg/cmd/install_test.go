@@ -287,6 +287,10 @@ func TestInstallLatestNeverPicksABackportPublishedAfterAHigherRelease(t *testing
 	assert.Equal(t, []string{"educates-3.8.0"}, binDirEntries(t, env))
 }
 
+// noStableRelease is the error resolving latest gives when the repository
+// has no stable release.
+const noStableRelease = "no stable releases found in educates/educates-training-platform. Run 'educatesenv list-remote --pre-releases' to see pre-releases"
+
 func TestInstallLatestFailsWhenThereIsNoStableRelease(t *testing.T) {
 	env := clitest.New(t)
 	addPublishedRelease(env, "3.8.0-rc.2", published(time.August, 15), true)
@@ -294,7 +298,16 @@ func TestInstallLatestFailsWhenThereIsNoStableRelease(t *testing.T) {
 
 	res := env.Run("install", "latest")
 
-	require.EqualError(t, res.Err, "failed to install version latest: no stable releases found in educates/educates-training-platform. Run 'educatesenv list-remote --pre-releases' to see pre-releases")
+	require.EqualError(t, res.Err, "failed to install version latest: "+noStableRelease)
 	assert.NotContains(t, res.Stdout, "Resolved latest")
 	assert.Empty(t, binDirEntries(t, env))
+}
+
+func TestInstallLatestNamesARepositoryThatIsNotFound(t *testing.T) {
+	env := clitest.New(t)
+	env.GitHub.SetRepository("acme", "elsewhere")
+
+	res := env.Run("install", "latest")
+
+	require.EqualError(t, res.Err, "failed to install version latest: repository educates/educates-training-platform not found")
 }

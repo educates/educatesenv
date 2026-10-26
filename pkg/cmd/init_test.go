@@ -1,9 +1,11 @@
 package cmd_test
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -37,4 +39,37 @@ func TestInitKeepsAnExistingConfig(t *testing.T) {
 	content, err := os.ReadFile(configPath)
 	require.NoError(t, err)
 	assert.Equal(t, "github:\n  org: acme\n", string(content))
+}
+
+func TestInitDownloadInstallsTheHighestStableReleaseAfterARunOfPreReleases(t *testing.T) {
+	env := clitest.New(t)
+	// The twelve newest releases are release candidates of 3.8.0, as
+	// during its release-candidate cycle.
+	for rc := 12; rc >= 1; rc-- {
+		addPublishedRelease(env, fmt.Sprintf("3.8.0-rc.%d", rc), published(time.August, 14+rc), true)
+	}
+	addPublishedRelease(env, "3.7.3", published(time.August, 1), false)
+	addPublishedRelease(env, "3.7.2", published(time.July, 1), false)
+
+	res := env.Run("init", "--download")
+
+	require.NoError(t, res.Err)
+	assert.Contains(t, res.Stdout, "Resolved latest to 3.7.3\nInstalling version 3.7.3...\n")
+	assert.Contains(t, res.Stdout, "educates 3.7.3 is now active.\n")
+	target, err := os.Readlink(env.ActiveLink())
+	require.NoError(t, err)
+	assert.Equal(t, "educates-3.7.3", target)
+	content, err := os.ReadFile(filepath.Join(env.BinDir(), "educates-3.7.3"))
+	require.NoError(t, err)
+	assert.Equal(t, "educates 3.7.3 binary", string(content))
+}
+
+func TestInitDownloadFailsWhenThereIsNoStableRelease(t *testing.T) {
+	env := clitest.New(t)
+	addPublishedRelease(env, "3.8.0-rc.1", published(time.August, 14), true)
+
+	res := env.Run("init", "--download")
+
+	require.EqualError(t, res.Err, noStableRelease)
+	assert.NoFileExists(t, env.ActiveLink())
 }
