@@ -3,11 +3,9 @@ package github
 import (
 	"context"
 	"fmt"
-	"net/url"
-	"strings"
 
 	"github.com/educates/educatesenv/pkg/config"
-	"github.com/google/go-github/v71/github"
+	"github.com/google/go-github/v93/github"
 	"golang.org/x/oauth2"
 )
 
@@ -39,22 +37,18 @@ func New(cfg *config.Config, opts ...Option) (*Client, error) {
 		opt(&o)
 	}
 
-	ctx := context.Background()
-	var client *github.Client
-
+	var clientOpts []github.ClientOptionsFunc
 	if cfg.Github.Token != "" {
 		ts := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: cfg.Github.Token})
-		client = github.NewClient(oauth2.NewClient(ctx, ts))
-	} else {
-		client = github.NewClient(nil)
+		clientOpts = append(clientOpts, github.WithHTTPClient(oauth2.NewClient(context.Background(), ts)))
+	}
+	if o.baseURL != "" {
+		clientOpts = append(clientOpts, github.WithURLs(&o.baseURL, nil))
 	}
 
-	if o.baseURL != "" {
-		base, err := url.Parse(strings.TrimSuffix(o.baseURL, "/") + "/")
-		if err != nil {
-			return nil, fmt.Errorf("invalid GitHub API base URL: %w", err)
-		}
-		client.BaseURL = base
+	client, err := github.NewClient(clientOpts...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create GitHub client: %w", err)
 	}
 
 	return &Client{
@@ -78,8 +72,8 @@ func (c *Client) GetLatestReleaseVersion() (string, error) {
 	}
 
 	for _, rel := range releases {
-		if rel.TagName != nil && !rel.GetPrerelease() {
-			return *rel.TagName, nil
+		if rel.GetTagName() != "" && !rel.GetPrerelease() {
+			return rel.GetTagName(), nil
 		}
 	}
 	return "", fmt.Errorf("no stable releases found in %s/%s. Try 'educatesenv list-remote --all' to see pre-releases", c.config.Github.Org, c.config.Github.Repository)
