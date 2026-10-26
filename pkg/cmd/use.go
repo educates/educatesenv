@@ -1,7 +1,9 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -45,7 +47,10 @@ func newUseCommand(d *deps) *cobra.Command {
 
 			// Handle regular version
 			if err := d.manager.UseVersion(version); err != nil {
-				return fmt.Errorf("version %s is not installed. You should install it first with `educatesenv install %s`", version, version)
+				if errors.Is(err, fs.ErrNotExist) {
+					return fmt.Errorf("version %s is not installed. You should install it first with `educatesenv install %s`", version, version)
+				}
+				return fmt.Errorf("failed to switch to version %s: %w", version, err)
 			}
 
 			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Now using educates version %s\n", version)

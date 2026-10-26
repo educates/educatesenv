@@ -3,6 +3,7 @@ package version
 import (
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -76,7 +77,8 @@ func (m *Manager) isDevSymlink(symlinkPath string) (bool, error) {
 	return !inBinDir || !strings.HasPrefix(filepath.Base(target), platform.BinaryPrefix), nil
 }
 
-// UseVersion sets a version as active
+// UseVersion sets a version as active. When the version's binary is
+// missing, the error wraps fs.ErrNotExist.
 func (m *Manager) UseVersion(version string) error {
 	symlinkPath := filepath.Join(m.config.Local.Dir, "educates")
 
@@ -170,7 +172,7 @@ func (m *Manager) createSymlink(source, target string) error {
 	// Check if source exists
 	if _, err := os.Stat(source); err != nil {
 		if os.IsNotExist(err) {
-			return fmt.Errorf("binary not found at %s", source)
+			return fmt.Errorf("binary not found at %s: %w", source, fs.ErrNotExist)
 		}
 		return fmt.Errorf("failed to check binary: %w", err)
 	}
