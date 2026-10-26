@@ -31,8 +31,7 @@ func runList(d *deps) func(cmd *cobra.Command, args []string) error {
 		files, err := os.ReadDir(cfg.Local.Dir)
 		// If the bin directory doesn't exist call init
 		if err != nil {
-			_, _, _, _, err := config.CreateConfigAndFolders()
-			if err != nil {
+			if _, _, err := config.CreateDefault(); err != nil {
 				return fmt.Errorf("you should run `educatesenv init` first")
 			}
 		}

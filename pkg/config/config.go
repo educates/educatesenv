@@ -27,11 +27,12 @@ const (
 	ConfigFileName = "config.yaml"
 )
 
-// GithubConfig holds GitHub-related configuration
+// GithubConfig holds GitHub-related configuration. An empty token is left
+// out of the YAML, so the default config file holds no token key.
 type GithubConfig struct {
 	Org        string `yaml:"org"`
 	Repository string `yaml:"repository"`
-	Token      string `yaml:"token"`
+	Token      string `yaml:"token,omitempty"`
 }
 
 // LocalConfig holds local directory configuration
@@ -274,39 +275,40 @@ func fileBool(n *yaml.Node) (bool, error) {
 	}
 }
 
-// CreateConfigAndFolders ensures the config and bin directories exist, and creates a default config.yaml if not present.
-// Returns (configDir, binDir, configPath, configCreated, error)
-func CreateConfigAndFolders() (string, string, string, bool, error) {
-	home, err := os.UserHomeDir()
+// CreateDefault creates the educatesenv directory in the user's home
+// directory and its bin directory, and writes the default config file there
+// unless a config file exists. The file is readable only by its owner and
+// holds no token. CreateDefault returns the paths and whether it wrote the
+// file, and fails when the home directory cannot be determined.
+func CreateDefault() (Paths, bool, error) {
+	paths, err := homePaths()
 	if err != nil {
-		home = "."
-	}
-	configDir := filepath.Join(home, ConfigDirName)
-	binDir := filepath.Join(configDir, "bin")
-	configPath := filepath.Join(configDir, "config.yaml")
-
-	if err := os.MkdirAll(binDir, 0o755); err != nil {
-		return configDir, binDir, configPath, false, fmt.Errorf("failed to create bin directory: %w", err)
-	}
-	if err := os.MkdirAll(configDir, 0o755); err != nil {
-		return configDir, binDir, configPath, false, fmt.Errorf("failed to create config directory: %w", err)
+		return Paths{}, false, err
 	}
 
-	configCreated := false
-	if _, err := os.Stat(configPath); err == nil {
-		// Config file already exists
-		configCreated = false
-	} else {
-		// Create new config with defaults
-		configFile := defaults(pathsIn(home))
-		yamlBytes, err := yaml.Marshal(&configFile)
-		if err != nil {
-			return configDir, binDir, configPath, false, fmt.Errorf("failed to marshal config to YAML: %w", err)
-		}
-		if err := os.WriteFile(configPath, yamlBytes, 0o644); err != nil {
-			return configDir, binDir, configPath, false, fmt.Errorf("failed to write config file: %w", err)
-		}
-		configCreated = true
+	if err := os.MkdirAll(paths.BinDir, 0o755); err != nil {
+		return paths, false, fmt.Errorf("failed to create bin directory: %w", err)
 	}
-	return configDir, binDir, configPath, configCreated, nil
+
+	content, err := yaml.Marshal(defaults(paths))
+	if err != nil {
+		return paths, false, fmt.Errorf("failed to marshal config to YAML: %w", err)
+	}
+
+	f, err := os.OpenFile(paths.File, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if errors.Is(err, fs.ErrExist) {
+		return paths, false, nil
+	}
+	if err != nil {
+		return paths, false, fmt.Errorf("failed to write config file: %w", err)
+	}
+	_, err = f.Write(content)
+	if closeErr := f.Close(); err == nil {
+		err = closeErr
+	}
+	if err != nil {
+		_ = os.Remove(paths.File)
+		return paths, false, fmt.Errorf("failed to write config file: %w", err)
+	}
+	return paths, true, nil
 }

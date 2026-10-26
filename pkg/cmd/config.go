@@ -30,14 +30,14 @@ func newConfigInitCommand() *cobra.Command {
 		// Disable automatic usage printing on error
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			_, _, configPath, created, err := config.CreateConfigAndFolders()
+			paths, created, err := config.CreateDefault()
 			if err != nil {
 				return err
 			}
 			if !created {
-				return fmt.Errorf("config file already exists at %s", configPath)
+				return fmt.Errorf("config file already exists at %s", paths.File)
 			}
-			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Config file created at %s\n", configPath)
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Config file created at %s\n", paths.File)
 			return nil
 		},
 	}

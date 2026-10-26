@@ -25,15 +25,16 @@ func newInitCommand(d *deps) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			out := cmd.OutOrStdout()
 
-			_, defaultBin, configPath, configCreated, err := config.CreateConfigAndFolders()
+			paths, configCreated, err := config.CreateDefault()
 			if err != nil {
 				return err
 			}
+			defaultBin := paths.BinDir
 
 			if configCreated {
-				_, _ = fmt.Fprintf(out, "Config file created at %s\n", configPath)
+				_, _ = fmt.Fprintf(out, "Config file created at %s\n", paths.File)
 			} else {
-				_, _ = fmt.Fprintf(out, "Config file already exists at %s\n", configPath)
+				_, _ = fmt.Fprintf(out, "Config file already exists at %s\n", paths.File)
 			}
 			_, _ = fmt.Fprintf(out, "Bin directory ensured at %s\n", defaultBin)
 

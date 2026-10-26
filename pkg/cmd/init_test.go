@@ -11,6 +11,40 @@ import (
 	"github.com/educates/educatesenv/internal/clitest"
 )
 
+// defaultConfig returns the config file that init and config init create.
+func defaultConfig(env *clitest.Env) string {
+	return "github:\n" +
+		"    org: educates\n" +
+		"    repository: educates-training-platform\n" +
+		"local:\n" +
+		"    dir: " + env.BinDir() + "\n" +
+		"development:\n" +
+		"    enabled: false\n" +
+		"    binaryLocation: \"\"\n"
+}
+
+// assertDefaultConfig checks that the config file holds the default config
+// and that only its owner can read it.
+func assertDefaultConfig(t *testing.T, env *clitest.Env) {
+	t.Helper()
+	configPath := filepath.Join(env.ConfigDir(), "config.yaml")
+	info, err := os.Stat(configPath)
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
+	content, err := os.ReadFile(configPath)
+	require.NoError(t, err)
+	assert.Equal(t, defaultConfig(env), string(content))
+}
+
+func TestInitWritesTheDefaultConfigReadableOnlyByItsOwner(t *testing.T) {
+	env := clitest.New(t)
+
+	res := env.Run("init")
+
+	require.NoError(t, res.Err)
+	assertDefaultConfig(t, env)
+}
+
 func TestInitCreatesTheConfigAndBinDirectory(t *testing.T) {
 	env := clitest.New(t)
 	configPath := filepath.Join(env.ConfigDir(), "config.yaml")
