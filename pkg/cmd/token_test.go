@@ -26,6 +26,7 @@ const (
 
 // tokenSource sets up one source of the GitHub token in env.
 type tokenSource struct {
+	// name is how error messages name the source.
 	name  string
 	token string
 	// label is how config view shows a token from this source.
@@ -48,7 +49,7 @@ var tokenSources = []tokenSource{
 	{name: "gh auth token", token: ghCLIToken, label: "<set via gh auth token>", set: func(env *clitest.Env) {
 		fakeGHWithToken(env, ghCLIToken)
 	}},
-	{name: "config file", token: fileToken, label: "<set in config file, deprecated>", set: func(env *clitest.Env) {
+	{name: "config file (deprecated)", token: fileToken, label: "<set in config file, deprecated>", set: func(env *clitest.Env) {
 		env.WriteConfig("github:\n  token: " + fileToken + "\n")
 	}},
 }

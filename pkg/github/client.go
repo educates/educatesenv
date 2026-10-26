@@ -2,7 +2,10 @@ package github
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
+	"time"
 
 	"github.com/educates/educatesenv/pkg/config"
 	"github.com/educates/educatesenv/pkg/releases"
@@ -86,12 +89,10 @@ type ReleaseAssets struct {
 // returns the download URLs of its binaryName asset and of its
 // checksums.txt.
 func (c *Client) GetReleaseAssets(version, binaryName string) (ReleaseAssets, error) {
-	release, resp, err := c.client.Repositories.GetReleaseByTag(context.Background(), c.config.Github.Org, c.config.Github.Repository, version)
+	release, _, err := c.client.Repositories.GetReleaseByTag(context.Background(), c.config.Github.Org, c.config.Github.Repository, version)
 	if err != nil {
-		if resp != nil && resp.StatusCode == 404 {
-			return ReleaseAssets{}, fmt.Errorf("version %s not found. Run 'educatesenv list-remote' to see available versions", version)
-		}
-		return ReleaseAssets{}, fmt.Errorf("failed to fetch release info: %w", err)
+		notFound := fmt.Errorf("version %s not found. Run 'educatesenv list-remote' to see available versions", version)
+		return ReleaseAssets{}, c.apiError(err, notFound, "failed to fetch release info")
 	}
 
 	var assets ReleaseAssets
@@ -118,10 +119,8 @@ func (c *Client) ListReleases() ([]releases.Release, error) {
 	for {
 		page, resp, err := c.client.Repositories.ListReleases(context.Background(), c.config.Github.Org, c.config.Github.Repository, opts)
 		if err != nil {
-			if resp != nil && resp.StatusCode == 404 {
-				return nil, fmt.Errorf("repository %s/%s not found", c.config.Github.Org, c.config.Github.Repository)
-			}
-			return nil, fmt.Errorf("failed to fetch releases: %w", err)
+			notFound := fmt.Errorf("repository %s/%s not found", c.config.Github.Org, c.config.Github.Repository)
+			return nil, c.apiError(err, notFound, "failed to fetch releases")
 		}
 
 		for _, rel := range page {
@@ -138,4 +137,37 @@ func (c *Client) ListReleases() ([]releases.Release, error) {
 		}
 		opts.Page = resp.NextPage
 	}
+}
+
+// apiError returns the error the user sees for err, the error of a GitHub
+// API call. A rate limit says when it resets, and a token GitHub rejects
+// with a 401 is named by its source. A 404 gives notFound. Any other error
+// is wrapped, with failure saying what failed.
+func (c *Client) apiError(err, notFound error, failure string) error {
+	if rateLimit, ok := errors.AsType[*github.RateLimitError](err); ok {
+		return c.rateLimitError(rateLimit.Rate.Reset.Time)
+	}
+	if response, ok := errors.AsType[*github.ErrorResponse](err); ok && response.Response != nil {
+		switch status := response.Response.StatusCode; {
+		case status == http.StatusUnauthorized && c.token.IsSet():
+			message := response.Message
+			if message == "" {
+				message = http.StatusText(status)
+			}
+			return fmt.Errorf("GitHub rejected the token from %s: %d %s. Replace or remove that token and try again", c.token.Source(), status, message)
+		case status == http.StatusNotFound:
+			return notFound
+		}
+	}
+	return fmt.Errorf("%s: %w", failure, err)
+}
+
+// rateLimitError returns the error for a rate limit that resets at reset.
+// Without a token, it says how to authenticate, which raises the limit.
+func (c *Client) rateLimitError(reset time.Time) error {
+	resets := reset.UTC().Format(time.DateTime) + " UTC"
+	if c.token.IsSet() {
+		return fmt.Errorf("GitHub API rate limit exceeded for the token from %s; it resets at %s", c.token.Source(), resets)
+	}
+	return fmt.Errorf("GitHub API rate limit exceeded; it resets at %s. Set GH_TOKEN or run 'gh auth login' to authenticate and get a higher limit", resets)
 }
