@@ -25,6 +25,7 @@ func newInitCommand(d *deps) *cobra.Command {
 		Args:          cobra.NoArgs,
 		SilenceErrors: true,
 		SilenceUsage:  true,
+		PreRun:        d.cleanUpDevelopmentSymlink,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			out := cmd.OutOrStdout()
 

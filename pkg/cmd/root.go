@@ -36,8 +36,9 @@ type deps struct {
 }
 
 // load reads the configuration and creates the GitHub client and the
-// version manager. Warnings and the manager's progress go to out.
-func (d *deps) load(out io.Writer) error {
+// version manager. Config warnings and the manager's progress go to out,
+// and the manager's warnings to errOut.
+func (d *deps) load(out, errOut io.Writer) error {
 	var err error
 	d.cfg, err = config.Load(out)
 	if err != nil {
@@ -49,8 +50,18 @@ func (d *deps) load(out io.Writer) error {
 		return err
 	}
 
-	d.manager = version.New(d.cfg, d.gh, out)
+	d.manager = version.New(d.cfg, d.gh, out, errOut)
 	return nil
+}
+
+// cleanUpDevelopmentSymlink removes the educates symlink when it points
+// at a development binary while development mode is disabled, and warns
+// about it. Only the commands that deal with the active binary run it,
+// as their PreRun hook.
+func (d *deps) cleanUpDevelopmentSymlink(cmd *cobra.Command, _ []string) {
+	if err := d.manager.ValidateDevelopmentMode(); err != nil {
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Warning: %v\n", err)
+	}
 }
 
 // NewRootCommand builds the educatesenv command tree. Each call builds a
@@ -66,20 +77,7 @@ func NewRootCommand(opts ...Option) *cobra.Command {
 		Short: "Manage multiple versions of the educates binary",
 		Long:  `A version manager for educates, inspired by tfenv.`,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			if err := d.load(cmd.OutOrStdout()); err != nil {
-				return err
-			}
-
-			// Skip validation for help command
-			if cmd.Name() == "help" {
-				return nil
-			}
-
-			// Validate development mode configuration
-			if err := d.manager.ValidateDevelopmentMode(); err != nil {
-				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Warning: %v\n", err)
-			}
-			return nil
+			return d.load(cmd.OutOrStdout(), cmd.ErrOrStderr())
 		},
 	}
 
@@ -90,6 +88,7 @@ func NewRootCommand(opts ...Option) *cobra.Command {
 		newListCommand(d),
 		newListLocalCommand(d),
 		newListRemoteCommand(d),
+		newUninstallCommand(d),
 		newUseCommand(d),
 		newVersionCommand(),
 	)
