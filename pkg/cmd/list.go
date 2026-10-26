@@ -17,6 +17,7 @@ func newListCommand(d *deps) *cobra.Command {
 		Args:          cobra.NoArgs,
 		SilenceErrors: true,
 		SilenceUsage:  true,
+		PreRun:        d.cleanUpDevelopmentSymlink,
 		RunE:          runList(d),
 	}
 }
