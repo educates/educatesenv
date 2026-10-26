@@ -1,0 +1,10 @@
+# Keeps the GitHub Actions in .github/workflows at their latest release.
+# The actions are pinned by commit SHA with the release tag in a trailing
+# comment, and Dependabot updates both. The golangci-lint and GoReleaser
+# versions are action inputs, which Dependabot does not update.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
