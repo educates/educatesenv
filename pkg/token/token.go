@@ -44,6 +44,11 @@ var environment = []struct {
 	{"GITHUB_TOKEN", githubToken},
 }
 
+// configFileWarning is the warning for a token from the config file. Its
+// verb is the file's path.
+const configFileWarning = "Warning: github.token in %s is deprecated, and a later release will stop reading it. " +
+	"Set GH_TOKEN or run 'gh auth login' instead, and remove the token from that file.\n"
+
 // Token is a GitHub token and the source it came from. Formatting a Token
 // with %s or %v shows its source, never any character of the token.
 type Token struct {
@@ -103,7 +108,7 @@ func Resolve(file, fileToken string, warnings io.Writer) Token {
 		return Token{value: value, source: ghAuthToken}
 	}
 	if fileToken != "" {
-		_, _ = fmt.Fprintf(warnings, "Warning: github.token in %s is deprecated, and a later release will stop reading it. Set GH_TOKEN or run 'gh auth login' instead, and remove the token from that file.\n", file)
+		_, _ = fmt.Fprintf(warnings, configFileWarning, file)
 		return Token{value: fileToken, source: configFile}
 	}
 	return Token{}
