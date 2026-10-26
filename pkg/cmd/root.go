@@ -51,7 +51,11 @@ func initDependencies() {
 	}
 
 	// Initialize GitHub client
-	gh = github.New(cfg)
+	var err error
+	gh, err = github.New(cfg)
+	if err != nil {
+		cobra.CheckErr(err)
+	}
 
 	// Initialize version manager
 	manager = version.New(cfg, gh)

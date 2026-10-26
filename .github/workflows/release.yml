@@ -10,6 +10,11 @@ on:
         description: 'Tag or version to build (e.g., v1.2.3). If not set, uses latest commit.'
         required: false
         default: ''
+      skip-signing:
+        description: 'Release without signing and notarizing the macOS binaries, for when the Apple membership or certificate is unavailable.'
+        type: boolean
+        required: false
+        default: false
 
 jobs:
   release:
@@ -23,22 +28,23 @@ jobs:
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         ref: ${{ github.event.inputs.release_tag != '' && github.event.inputs.release_tag || github.ref_type == 'tag' && github.ref_name || github.sha }}
 
     - name: Set up Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
       with:
-        go-version: '1.24'
+        go-version-file: go.mod
         cache: true
 
     - name: Run GoReleaser
-      uses: goreleaser/goreleaser-action@v6
+      uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
       with:
-        # 'latest', 'nightly', or a semver
-        version: "~> v2"
-        args: release --clean
+        version: v2.19.0
+        # Only a manual run can skip signing; releases from tag pushes always
+        # sign, and fail when signing fails.
+        args: release --clean${{ github.event_name == 'workflow_dispatch' && inputs.skip-signing && ' --skip=notarize' || '' }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         # The base64 of the contents of your '.p12' key.

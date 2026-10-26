@@ -5,7 +5,7 @@ version: 2
 builds:
   - main: ./cmd/educatesenv
     id: educatesenv
-    binary: educatesenv-{{ .Os }}-{{ .Arch }}
+    binary: educatesenv
     env:
       - CGO_ENABLED=0
     goos:
@@ -22,6 +22,9 @@ builds:
 archives:
   - formats:
       - binary
+    # Release assets are named educatesenv-<os>-<arch>, as the download
+    # instructions in the release notes header expect.
+    name_template: "{{ .ProjectName }}-{{ .Os }}-{{ .Arch }}"
 
 checksum:
   name_template: 'checksums.txt'

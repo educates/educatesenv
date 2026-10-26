@@ -3,7 +3,6 @@
 version: "2"
 
 run:
-  go: '1.24'
   timeout: 5m
   modules-download-mode: readonly
   relative-path-mode: gomod

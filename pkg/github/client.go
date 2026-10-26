@@ -5,8 +5,7 @@ import (
 	"fmt"
 
 	"github.com/educates/educatesenv/pkg/config"
-	"github.com/google/go-github/v71/github"
-	"golang.org/x/oauth2"
+	"github.com/google/go-github/v93/github"
 )
 
 // Client wraps the GitHub client with our configuration
@@ -15,22 +14,45 @@ type Client struct {
 	config *config.Config
 }
 
-// New creates a new GitHub client with optional authentication
-func New(cfg *config.Config) *Client {
-	ctx := context.Background()
-	var client *github.Client
+// options holds the settings that Option values change.
+type options struct {
+	baseURL string
+}
 
+// Option changes how New builds a Client.
+type Option func(*options)
+
+// WithBaseURL sets the GitHub API base URL. The default is github.com's API.
+func WithBaseURL(baseURL string) Option {
+	return func(o *options) {
+		o.baseURL = baseURL
+	}
+}
+
+// New creates a new GitHub client, authenticated when the config holds a token
+func New(cfg *config.Config, opts ...Option) (*Client, error) {
+	var o options
+	for _, opt := range opts {
+		opt(&o)
+	}
+
+	var clientOpts []github.ClientOptionsFunc
 	if cfg.Github.Token != "" {
-		ts := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: cfg.Github.Token})
-		client = github.NewClient(oauth2.NewClient(ctx, ts))
-	} else {
-		client = github.NewClient(nil)
+		clientOpts = append(clientOpts, github.WithAuthToken(cfg.Github.Token))
+	}
+	if o.baseURL != "" {
+		clientOpts = append(clientOpts, github.WithURLs(&o.baseURL, nil))
+	}
+
+	client, err := github.NewClient(clientOpts...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create GitHub client: %w", err)
 	}
 
 	return &Client{
 		client: client,
 		config: cfg,
-	}
+	}, nil
 }
 
 // GetLatestReleaseVersion returns the latest stable release version
@@ -48,8 +70,8 @@ func (c *Client) GetLatestReleaseVersion() (string, error) {
 	}
 
 	for _, rel := range releases {
-		if rel.TagName != nil && !rel.GetPrerelease() {
-			return *rel.TagName, nil
+		if rel.GetTagName() != "" && !rel.GetPrerelease() {
+			return rel.GetTagName(), nil
 		}
 	}
 	return "", fmt.Errorf("no stable releases found in %s/%s. Try 'educatesenv list-remote --all' to see pre-releases", c.config.Github.Org, c.config.Github.Repository)
