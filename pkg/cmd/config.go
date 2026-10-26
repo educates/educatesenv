@@ -41,9 +41,9 @@ func newConfigInitCommand() *cobra.Command {
 				return err
 			}
 			if !created {
-				return fmt.Errorf("config file already exists at %s", paths.File)
+				return fmt.Errorf("config file already exists at %s", paths.ConfigFile)
 			}
-			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Config file created at %s\n", paths.File)
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Config file created at %s\n", paths.ConfigFile)
 			return nil
 		},
 	}

@@ -69,12 +69,12 @@ func (c *Config) File() string {
 type Paths struct {
 	// Home is the user's home directory.
 	Home string
-	// Dir is the educatesenv directory in Home.
-	Dir string
+	// ConfigDir is the educatesenv directory in Home.
+	ConfigDir string
 	// BinDir is the default directory installed versions go in.
 	BinDir string
-	// File is the config file in Dir.
-	File string
+	// ConfigFile is the config file in ConfigDir.
+	ConfigFile string
 }
 
 // homePaths returns the paths in the user's home directory.
@@ -88,12 +88,12 @@ func homePaths() (Paths, error) {
 
 // pathsIn returns the paths in home.
 func pathsIn(home string) Paths {
-	dir := filepath.Join(home, ConfigDirName)
+	configDir := filepath.Join(home, ConfigDirName)
 	return Paths{
-		Home:   home,
-		Dir:    dir,
-		BinDir: filepath.Join(dir, "bin"),
-		File:   filepath.Join(dir, ConfigFileName),
+		Home:       home,
+		ConfigDir:  configDir,
+		BinDir:     filepath.Join(configDir, "bin"),
+		ConfigFile: filepath.Join(configDir, ConfigFileName),
 	}
 }
 
@@ -133,8 +133,8 @@ func Load(out, errOut io.Writer) (*Config, error) {
 	}
 
 	cfg := defaults(paths)
-	cfg.file = paths.File
-	if err := cfg.applyFile(paths.File, errOut); err != nil {
+	cfg.file = paths.ConfigFile
+	if err := cfg.applyFile(paths.ConfigFile, errOut); err != nil {
 		return nil, err
 	}
 	cfg.applyEnv(errOut)
@@ -340,7 +340,7 @@ func CreateDefault() (Paths, bool, error) {
 		return paths, false, fmt.Errorf("failed to marshal config to YAML: %w", err)
 	}
 
-	f, err := os.OpenFile(paths.File, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	f, err := os.OpenFile(paths.ConfigFile, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 	if errors.Is(err, fs.ErrExist) {
 		return paths, false, nil
 	}
@@ -352,7 +352,7 @@ func CreateDefault() (Paths, bool, error) {
 		err = closeErr
 	}
 	if err != nil {
-		_ = os.Remove(paths.File)
+		_ = os.Remove(paths.ConfigFile)
 		return paths, false, fmt.Errorf("failed to write config file: %w", err)
 	}
 	return paths, true, nil
