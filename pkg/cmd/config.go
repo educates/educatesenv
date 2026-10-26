@@ -11,77 +11,82 @@ import (
 	"github.com/educates/educatesenv/pkg/config"
 )
 
-var configCmd = &cobra.Command{
-	Use:           "config",
-	Short:         "Manage educatesenv configuration",
-	SilenceErrors: true,
-	SilenceUsage:  true,
+func newConfigCommand(d *deps) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:           "config",
+		Short:         "Manage educatesenv configuration",
+		SilenceErrors: true,
+		SilenceUsage:  true,
+	}
+	cmd.AddCommand(newConfigInitCommand(), newConfigViewCommand(d))
+	return cmd
 }
 
-var configInitCmd = &cobra.Command{
-	Use:   "init",
-	Short: "Generate a default config file",
-	// Disable the automatic error printing
-	SilenceErrors: true,
-	// Disable automatic usage printing on error
-	SilenceUsage: true,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			home = "."
-		}
-		configDir := filepath.Join(home, config.ConfigDirName)
-		configPath := filepath.Join(configDir, "config.yaml")
+func newConfigInitCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "init",
+		Short: "Generate a default config file",
+		Args:  cobra.NoArgs,
+		// Disable the automatic error printing
+		SilenceErrors: true,
+		// Disable automatic usage printing on error
+		SilenceUsage: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			home, err := os.UserHomeDir()
+			if err != nil {
+				home = "."
+			}
+			configDir := filepath.Join(home, config.ConfigDirName)
+			configPath := filepath.Join(configDir, "config.yaml")
 
-		// Check if config already exists
-		if _, err := os.Stat(configPath); err == nil {
-			return fmt.Errorf("config file already exists at %s", configPath)
-		}
+			// Check if config already exists
+			if _, err := os.Stat(configPath); err == nil {
+				return fmt.Errorf("config file already exists at %s", configPath)
+			}
 
-		// Create config directory if it doesn't exist
-		if err := os.MkdirAll(configDir, 0o755); err != nil {
-			return fmt.Errorf("failed to create config directory: %w", err)
-		}
+			// Create config directory if it doesn't exist
+			if err := os.MkdirAll(configDir, 0o755); err != nil {
+				return fmt.Errorf("failed to create config directory: %w", err)
+			}
 
-		// Create new config with defaults
-		configFile := config.New()
+			// Create new config with defaults
+			configFile := config.New()
 
-		// Write configuration to file
-		yamlBytes, err := yaml.Marshal(&configFile)
-		if err != nil {
-			return fmt.Errorf("failed to marshal config to YAML: %w", err)
-		}
+			// Write configuration to file
+			yamlBytes, err := yaml.Marshal(&configFile)
+			if err != nil {
+				return fmt.Errorf("failed to marshal config to YAML: %w", err)
+			}
 
-		if err := os.WriteFile(configPath, yamlBytes, 0o644); err != nil {
-			return fmt.Errorf("failed to write config file: %w", err)
-		}
+			if err := os.WriteFile(configPath, yamlBytes, 0o644); err != nil {
+				return fmt.Errorf("failed to write config file: %w", err)
+			}
 
-		fmt.Printf("Config file created at %s\n", configPath)
-		return nil
-	},
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Config file created at %s\n", configPath)
+			return nil
+		},
+	}
 }
 
-var configViewCmd = &cobra.Command{
-	Use:           "view",
-	Short:         "Show the current configuration",
-	SilenceErrors: true,
-	SilenceUsage:  true,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		// Convert config struct to YAML
-		yamlBytes, err := yaml.Marshal(cfg)
-		if err != nil {
-			return fmt.Errorf("failed to marshal config to YAML: %w", err)
-		}
+func newConfigViewCommand(d *deps) *cobra.Command {
+	return &cobra.Command{
+		Use:           "view",
+		Short:         "Show the current configuration",
+		Args:          cobra.NoArgs,
+		SilenceErrors: true,
+		SilenceUsage:  true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Convert config struct to YAML
+			yamlBytes, err := yaml.Marshal(d.cfg)
+			if err != nil {
+				return fmt.Errorf("failed to marshal config to YAML: %w", err)
+			}
 
-		// Print the configuration
-		fmt.Println("Current configuration:")
-		fmt.Println(string(yamlBytes))
-		return nil
-	},
-}
-
-func init() {
-	configCmd.AddCommand(configInitCmd)
-	configCmd.AddCommand(configViewCmd)
-	rootCmd.AddCommand(configCmd)
+			// Print the configuration
+			out := cmd.OutOrStdout()
+			_, _ = fmt.Fprintln(out, "Current configuration:")
+			_, _ = fmt.Fprintln(out, string(yamlBytes))
+			return nil
+		},
+	}
 }

@@ -10,12 +10,23 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var listCmd = &cobra.Command{
-	Use:           "list",
-	Short:         "List installed educates versions",
-	SilenceErrors: true,
-	SilenceUsage:  true,
-	RunE: func(cmd *cobra.Command, args []string) error {
+func newListCommand(d *deps) *cobra.Command {
+	return &cobra.Command{
+		Use:           "list",
+		Short:         "List installed educates versions",
+		Args:          cobra.NoArgs,
+		SilenceErrors: true,
+		SilenceUsage:  true,
+		RunE:          runList(d),
+	}
+}
+
+// runList returns the run function that list and list-local share.
+func runList(d *deps) func(cmd *cobra.Command, args []string) error {
+	return func(cmd *cobra.Command, args []string) error {
+		cfg := d.cfg
+		out := cmd.OutOrStdout()
+
 		// Get all files in the bin directory
 		files, err := os.ReadDir(cfg.Local.Dir)
 		// If the bin directory doesn't exist call init
@@ -41,14 +52,14 @@ var listCmd = &cobra.Command{
 		}
 
 		// Print installed versions
-		fmt.Println("Installed versions:")
+		_, _ = fmt.Fprintln(out, "Installed versions:")
 
 		// Show development version if enabled
 		if cfg.Development.Enabled {
 			if isDevelopmentActive {
-				fmt.Printf("* develop (active) -> %s\n", cfg.Development.BinaryLocation)
+				_, _ = fmt.Fprintf(out, "* develop (active) -> %s\n", cfg.Development.BinaryLocation)
 			} else {
-				fmt.Printf("  develop -> %s\n", cfg.Development.BinaryLocation)
+				_, _ = fmt.Fprintf(out, "  develop -> %s\n", cfg.Development.BinaryLocation)
 			}
 		}
 
@@ -61,22 +72,18 @@ var listCmd = &cobra.Command{
 			if strings.HasPrefix(file.Name(), "educates-") {
 				version := strings.TrimPrefix(file.Name(), "educates-")
 				if version == activeVersion {
-					fmt.Printf("* %s (active)\n", version)
+					_, _ = fmt.Fprintf(out, "* %s (active)\n", version)
 				} else {
-					fmt.Printf("  %s\n", version)
+					_, _ = fmt.Fprintf(out, "  %s\n", version)
 				}
 				foundVersions = true
 			}
 		}
 
 		if !foundVersions && !cfg.Development.Enabled {
-			fmt.Println("No versions installed")
+			_, _ = fmt.Fprintln(out, "No versions installed")
 		}
 
 		return nil
-	},
-}
-
-func init() {
-	rootCmd.AddCommand(listCmd)
+	}
 }

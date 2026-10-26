@@ -8,11 +8,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	showAll     bool
-	showRecents bool
-)
-
 // isPreRelease checks if a version string contains pre-release indicators
 func isPreRelease(version string) bool {
 	preReleaseIndicators := []string{
@@ -28,51 +23,59 @@ func isPreRelease(version string) bool {
 	return false
 }
 
-var listRemoteCmd = &cobra.Command{
-	Use:           "list-remote",
-	Short:         "List all available versions from GitHub releases",
-	SilenceErrors: true,
-	SilenceUsage:  true,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		releases, err := gh.ListReleases()
-		if err != nil {
-			return fmt.Errorf("failed to fetch releases: %w", err)
-		}
+func newListRemoteCommand(d *deps) *cobra.Command {
+	var (
+		showAll     bool
+		showRecents bool
+	)
 
-		// Filter and collect versions
-		var versions []string
-		for _, rel := range releases {
-			version := rel.GetTagName()
-			if !showAll && (rel.GetPrerelease() || isPreRelease(version)) {
-				continue
+	cmd := &cobra.Command{
+		Use:           "list-remote",
+		Short:         "List all available versions from GitHub releases",
+		Args:          cobra.NoArgs,
+		SilenceErrors: true,
+		SilenceUsage:  true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			out := cmd.OutOrStdout()
+
+			releases, err := d.gh.ListReleases()
+			if err != nil {
+				return fmt.Errorf("failed to fetch releases: %w", err)
 			}
-			versions = append(versions, version)
-		}
 
-		// Sort versions in reverse order (newest first)
-		sort.Sort(sort.Reverse(sort.StringSlice(versions)))
+			// Filter and collect versions
+			var versions []string
+			for _, rel := range releases {
+				version := rel.GetTagName()
+				if !showAll && (rel.GetPrerelease() || isPreRelease(version)) {
+					continue
+				}
+				versions = append(versions, version)
+			}
 
-		// Limit to recent versions if requested
-		if showRecents && len(versions) > 10 {
-			versions = versions[:10]
-		}
+			// Sort versions in reverse order (newest first)
+			sort.Sort(sort.Reverse(sort.StringSlice(versions)))
 
-		// Print versions
-		fmt.Println("Available versions:")
-		for _, version := range versions {
-			fmt.Printf("- %s\n", version)
-		}
+			// Limit to recent versions if requested
+			if showRecents && len(versions) > 10 {
+				versions = versions[:10]
+			}
 
-		if len(versions) == 0 {
-			fmt.Println("No versions found")
-		}
+			// Print versions
+			_, _ = fmt.Fprintln(out, "Available versions:")
+			for _, version := range versions {
+				_, _ = fmt.Fprintf(out, "- %s\n", version)
+			}
 
-		return nil
-	},
-}
+			if len(versions) == 0 {
+				_, _ = fmt.Fprintln(out, "No versions found")
+			}
 
-func init() {
-	listRemoteCmd.Flags().BoolVar(&showAll, "all", false, "Show all versions including pre-releases")
-	listRemoteCmd.Flags().BoolVar(&showRecents, "recents", false, "Show only the 10 most recent versions")
-	rootCmd.AddCommand(listRemoteCmd)
+			return nil
+		},
+	}
+
+	cmd.Flags().BoolVar(&showAll, "all", false, "Show all versions including pre-releases")
+	cmd.Flags().BoolVar(&showRecents, "recents", false, "Show only the 10 most recent versions")
+	return cmd
 }

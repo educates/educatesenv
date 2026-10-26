@@ -18,13 +18,15 @@ import (
 type Manager struct {
 	config *config.Config
 	github *github.Client
+	out    io.Writer
 }
 
-// New creates a new version manager
-func New(cfg *config.Config, gh *github.Client) *Manager {
+// New creates a new version manager that reports progress to out
+func New(cfg *config.Config, gh *github.Client, out io.Writer) *Manager {
 	return &Manager{
 		config: cfg,
 		github: gh,
+		out:    out,
 	}
 }
 
@@ -121,12 +123,12 @@ func (m *Manager) InstallVersion(version string, force bool, activate bool) erro
 
 	// Handle installation
 	if versionExists && !force {
-		fmt.Printf("Version %s is already installed.\n", version)
+		_, _ = fmt.Fprintf(m.out, "Version %s is already installed.\n", version)
 	} else {
 		if versionExists {
-			fmt.Printf("Reinstalling version %s...\n", version)
+			_, _ = fmt.Fprintf(m.out, "Reinstalling version %s...\n", version)
 		} else {
-			fmt.Printf("Installing version %s...\n", version)
+			_, _ = fmt.Fprintf(m.out, "Installing version %s...\n", version)
 		}
 
 		assetName, err := m.GetPlatformBinaryName()
@@ -139,14 +141,14 @@ func (m *Manager) InstallVersion(version string, force bool, activate bool) erro
 			return err // Pass through the user-friendly error from GitHub client
 		}
 
-		fmt.Printf("Downloading %s...\n", downloadURL)
+		_, _ = fmt.Fprintf(m.out, "Downloading %s...\n", downloadURL)
 		if err := m.downloadFile(downloadURL, binaryPath); err != nil {
 			return fmt.Errorf("failed to download binary (check your internet connection and try again): %w", err)
 		}
 		if err := os.Chmod(binaryPath, 0o755); err != nil {
 			return fmt.Errorf("failed to set executable permissions on %s: %w", binaryPath, err)
 		}
-		fmt.Printf("educates %s installed successfully.\n", version)
+		_, _ = fmt.Fprintf(m.out, "educates %s installed successfully.\n", version)
 	}
 
 	// Handle activation if requested
@@ -154,7 +156,7 @@ func (m *Manager) InstallVersion(version string, force bool, activate bool) erro
 		if err := m.UseVersion(version); err != nil {
 			return fmt.Errorf("installation succeeded but failed to set version %s as active: %w", version, err)
 		}
-		fmt.Printf("educates %s is now active.\n", version)
+		_, _ = fmt.Fprintf(m.out, "educates %s is now active.\n", version)
 	}
 
 	return nil

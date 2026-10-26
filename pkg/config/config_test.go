@@ -1,6 +1,7 @@
 package config
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -9,6 +10,7 @@ import (
 )
 
 func TestNew(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
 	cfg := New()
 	assert.NotNil(t, cfg)
 	assert.Equal(t, DefaultGithubOrg, cfg.Github.Org)
@@ -26,6 +28,8 @@ func TestNew(t *testing.T) {
 }
 
 func TestLoad(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
 	// Setup temporary directory for test config
 	tmpDir, err := os.MkdirTemp("", "educatesenv-test")
 	assert.NoError(t, err)
@@ -61,7 +65,7 @@ development:
 
 	// Test loading config from file
 	cfg := New()
-	err = cfg.Load()
+	err = cfg.Load(io.Discard)
 	assert.NoError(t, err)
 	assert.Equal(t, "testorg", cfg.Github.Org)
 	assert.Equal(t, "testrepo", cfg.Github.Repository)
@@ -72,6 +76,8 @@ development:
 }
 
 func TestLoadWithEnvVars(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
 	// Set environment variables
 	envVars := map[string]string{
 		"EDUCATES_GITHUB_ORG":                  "envorg",
@@ -94,7 +100,7 @@ func TestLoadWithEnvVars(t *testing.T) {
 
 	// Test loading config with environment variables
 	cfg := New()
-	err := cfg.Load()
+	err := cfg.Load(io.Discard)
 	assert.NoError(t, err)
 	assert.Equal(t, "envorg", cfg.Github.Org)
 	assert.Equal(t, "envrepo", cfg.Github.Repository)
