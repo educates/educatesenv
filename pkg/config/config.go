@@ -27,12 +27,15 @@ const (
 	ConfigFileName = "config.yaml"
 )
 
-// GithubConfig holds GitHub-related configuration. An empty token is left
-// out of the YAML, so the default config file holds no token key.
+// GithubConfig holds GitHub-related configuration.
 type GithubConfig struct {
 	Org        string `yaml:"org"`
 	Repository string `yaml:"repository"`
-	Token      string `yaml:"token,omitempty"`
+	// Token is github.token from the config file, the last and deprecated
+	// source of the GitHub token. The token package resolves the token
+	// from every source. An empty token is left out of the YAML, so the
+	// default config file holds no token key.
+	Token string `yaml:"token,omitempty"`
 }
 
 // LocalConfig holds local directory configuration
@@ -51,6 +54,15 @@ type Config struct {
 	Github      GithubConfig      `yaml:"github"`
 	Local       LocalConfig       `yaml:"local"`
 	Development DevelopmentConfig `yaml:"development"`
+
+	file string
+}
+
+// File returns the path of the config file Load read the configuration
+// from, whether or not the file exists. It is empty when Load could not
+// determine the home directory.
+func (c *Config) File() string {
+	return c.file
 }
 
 // Paths are the places educatesenv keeps its files in.
@@ -102,7 +114,8 @@ func defaults(paths Paths) *Config {
 // Load returns the configuration: the defaults, overridden by the config
 // file in the user's educatesenv directory, overridden in turn by the
 // EDUCATES_* environment variables. An environment variable set to the
-// empty string counts as not set.
+// empty string counts as not set. The GitHub token is not among them: the
+// token package reads EDUCATES_GITHUB_TOKEN.
 //
 // Without a home directory, Load writes a warning to out, reads no config
 // file, and puts the bin directory under the current directory.
@@ -118,6 +131,7 @@ func Load(out io.Writer) (*Config, error) {
 	}
 
 	cfg := defaults(paths)
+	cfg.file = paths.File
 	if err := cfg.applyFile(paths.File); err != nil {
 		return nil, err
 	}
@@ -132,7 +146,8 @@ type setting struct {
 	// key is the value's key in the config file, as section.key. Keys
 	// match regardless of case.
 	key string
-	// env is the environment variable that overrides the config file.
+	// env is the environment variable that overrides the config file, or
+	// "" for a value only the config file sets.
 	env string
 	// Exactly one of str and boolean points at the field the value sets.
 	str     *string
@@ -143,7 +158,7 @@ func (c *Config) settings() []setting {
 	return []setting{
 		{key: "github.org", env: "EDUCATES_GITHUB_ORG", str: &c.Github.Org},
 		{key: "github.repository", env: "EDUCATES_GITHUB_REPOSITORY", str: &c.Github.Repository},
-		{key: "github.token", env: "EDUCATES_GITHUB_TOKEN", str: &c.Github.Token},
+		{key: "github.token", str: &c.Github.Token},
 		{key: "local.dir", env: "EDUCATES_LOCAL_DIR", str: &c.Local.Dir},
 		{key: "development.enabled", env: "EDUCATES_DEVELOPMENT_ENABLED", boolean: &c.Development.Enabled},
 		{key: "development.binaryLocation", env: "EDUCATES_DEVELOPMENT_BINARY_LOCATION", str: &c.Development.BinaryLocation},
@@ -154,6 +169,9 @@ func (c *Config) settings() []setting {
 // empty.
 func (c *Config) applyEnv() error {
 	for _, s := range c.settings() {
+		if s.env == "" {
+			continue
+		}
 		value := os.Getenv(s.env)
 		if value == "" {
 			continue

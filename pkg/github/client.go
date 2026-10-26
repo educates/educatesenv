@@ -6,6 +6,7 @@ import (
 
 	"github.com/educates/educatesenv/pkg/config"
 	"github.com/educates/educatesenv/pkg/releases"
+	"github.com/educates/educatesenv/pkg/token"
 	"github.com/google/go-github/v93/github"
 )
 
@@ -13,11 +14,13 @@ import (
 type Client struct {
 	client *github.Client
 	config *config.Config
+	token  token.Token
 }
 
 // options holds the settings that Option values change.
 type options struct {
 	baseURL string
+	token   token.Token
 }
 
 // Option changes how New builds a Client.
@@ -30,7 +33,15 @@ func WithBaseURL(baseURL string) Option {
 	}
 }
 
-// New creates a new GitHub client, authenticated when the config holds a token
+// WithToken authenticates the client's requests with tok. Without a set
+// token, the client calls the API unauthenticated.
+func WithToken(tok token.Token) Option {
+	return func(o *options) {
+		o.token = tok
+	}
+}
+
+// New creates a new GitHub client for the repository cfg names
 func New(cfg *config.Config, opts ...Option) (*Client, error) {
 	var o options
 	for _, opt := range opts {
@@ -38,8 +49,8 @@ func New(cfg *config.Config, opts ...Option) (*Client, error) {
 	}
 
 	var clientOpts []github.ClientOptionsFunc
-	if cfg.Github.Token != "" {
-		clientOpts = append(clientOpts, github.WithAuthToken(cfg.Github.Token))
+	if o.token.IsSet() {
+		clientOpts = append(clientOpts, github.WithAuthToken(o.token.Value()))
 	}
 	if o.baseURL != "" {
 		clientOpts = append(clientOpts, github.WithURLs(&o.baseURL, nil))
@@ -53,6 +64,7 @@ func New(cfg *config.Config, opts ...Option) (*Client, error) {
 	return &Client{
 		client: client,
 		config: cfg,
+		token:  o.token,
 	}, nil
 }
 

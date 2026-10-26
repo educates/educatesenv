@@ -8,6 +8,7 @@ import (
 
 	"github.com/educates/educatesenv/pkg/config"
 	"github.com/educates/educatesenv/pkg/github"
+	"github.com/educates/educatesenv/pkg/token"
 	"github.com/educates/educatesenv/pkg/version"
 )
 
@@ -45,7 +46,8 @@ func (d *deps) load(out, errOut io.Writer) error {
 		return err
 	}
 
-	d.gh, err = github.New(d.cfg, github.WithBaseURL(d.opts.githubBaseURL))
+	tok := token.Resolve(d.cfg.File(), d.cfg.Github.Token, errOut)
+	d.gh, err = github.New(d.cfg, github.WithBaseURL(d.opts.githubBaseURL), github.WithToken(tok))
 	if err != nil {
 		return err
 	}
