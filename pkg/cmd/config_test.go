@@ -224,6 +224,45 @@ func TestBooleansAcceptTheirUsualForms(t *testing.T) {
 	}
 }
 
+func TestAMalformedValueIsAnError(t *testing.T) {
+	t.Run("a boolean in the environment", func(t *testing.T) {
+		env := clitest.New(t)
+		env.Setenv("EDUCATES_DEVELOPMENT_ENABLED", "yes")
+
+		res := env.Run("config", "view")
+
+		require.EqualError(t, res.Err, `EDUCATES_DEVELOPMENT_ENABLED: "yes" is not a boolean; use true or false`)
+	})
+
+	t.Run("a boolean in the config file", func(t *testing.T) {
+		env := clitest.New(t)
+		configPath := env.WriteConfig("development:\n  enabled: yes\n")
+
+		res := env.Run("config", "view")
+
+		require.EqualError(t, res.Err, `development.enabled in `+configPath+`: "yes" is not a boolean; use true or false`)
+	})
+
+	t.Run("a list in the config file", func(t *testing.T) {
+		env := clitest.New(t)
+		configPath := env.WriteConfig("github:\n  org: [acme, widgets]\n")
+
+		res := env.Run("config", "view")
+
+		require.EqualError(t, res.Err, `github.org in `+configPath+`: expected a single value`)
+	})
+
+	t.Run("YAML that does not parse", func(t *testing.T) {
+		env := clitest.New(t)
+		configPath := env.WriteConfig("github:\n  org: acme\n bad indentation\n")
+
+		res := env.Run("config", "view")
+
+		require.Error(t, res.Err)
+		assert.Contains(t, res.Err.Error(), "error reading config file "+configPath+": ")
+	})
+}
+
 func TestRequestsCarryTheTokenFromTheEnvironmentOrTheConfigFile(t *testing.T) {
 	tests := []struct {
 		name   string
