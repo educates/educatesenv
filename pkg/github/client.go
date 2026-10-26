@@ -169,5 +169,5 @@ func (c *Client) rateLimitError(reset time.Time) error {
 	if c.token.IsSet() {
 		return fmt.Errorf("GitHub API rate limit exceeded for the token from %s; it resets at %s", c.token.Source(), resets)
 	}
-	return fmt.Errorf("GitHub API rate limit exceeded; it resets at %s. Set GH_TOKEN or run 'gh auth login' to authenticate and get a higher limit", resets)
+	return fmt.Errorf("GitHub API rate limit exceeded; it resets at %s. %s to authenticate and get a higher limit", resets, token.AuthenticationHint)
 }

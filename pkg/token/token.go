@@ -44,10 +44,14 @@ var tokenVariables = []struct {
 	{"GITHUB_TOKEN", githubToken},
 }
 
+// AuthenticationHint tells the user how to give educatesenv a token. It
+// starts a sentence that each message finishes in its own way.
+const AuthenticationHint = "Set GH_TOKEN or run 'gh auth login'"
+
 // configFileWarning is the warning for a token from the config file. Its
 // verb is the file's path.
 const configFileWarning = "Warning: github.token in %s is deprecated, and a later release will stop reading it. " +
-	"Set GH_TOKEN or run 'gh auth login' instead, and remove the token from that file.\n"
+	AuthenticationHint + " instead, and remove the token from that file.\n"
 
 // Token is a GitHub token and the source it came from. Formatting a Token
 // with %s or %v shows its source, never any character of the token.
