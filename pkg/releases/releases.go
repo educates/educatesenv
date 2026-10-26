@@ -64,7 +64,7 @@ func Select(all []Release, opts SelectOptions) (chosen []Release, candidates int
 		if opts.Order == ByPublishTime {
 			return b.PublishedAt.Compare(a.PublishedAt)
 		}
-		return semver.Compare(version(b.Tag), version(a.Tag))
+		return semver.Compare(semverForm(b.Tag), semverForm(a.Tag))
 	})
 
 	candidates = len(chosen)
@@ -77,12 +77,12 @@ func Select(all []Release, opts SelectOptions) (chosen []Release, candidates int
 // isPrerelease reports whether r is a pre-release: its tag has a semver
 // pre-release part, or GitHub flags it.
 func (r Release) isPrerelease() bool {
-	return r.GitHubPrerelease || semver.Prerelease(version(r.Tag)) != ""
+	return r.GitHubPrerelease || semver.Prerelease(semverForm(r.Tag)) != ""
 }
 
-// version returns tag in the form golang.org/x/mod/semver reads, which
+// semverForm returns tag in the form golang.org/x/mod/semver reads, which
 // needs a "v" prefix that Educates tags do not have.
-func version(tag string) string {
+func semverForm(tag string) string {
 	return "v" + tag
 }
 
@@ -90,6 +90,6 @@ func version(tag string) string {
 // or "4.0.0-alpha.13". The shorthands golang.org/x/mod/semver accepts,
 // such as "3.8", are not.
 func isSemver(tag string) bool {
-	v := version(tag)
+	v := semverForm(tag)
 	return semver.Canonical(v) == strings.TrimSuffix(v, semver.Build(v))
 }
