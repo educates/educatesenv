@@ -141,12 +141,8 @@ func (m *Manager) InstallVersion(version string, force bool, activate bool) erro
 			return err // Pass through the user-friendly error from GitHub client
 		}
 
-		_, _ = fmt.Fprintf(m.out, "Downloading %s...\n", downloadURL)
-		if err := m.downloadFile(downloadURL, binaryPath); err != nil {
-			return fmt.Errorf("failed to download binary (check your internet connection and try again): %w", err)
-		}
-		if err := os.Chmod(binaryPath, 0o755); err != nil {
-			return fmt.Errorf("failed to set executable permissions on %s: %w", binaryPath, err)
+		if err := m.installBinary(downloadURL, binaryPath); err != nil {
+			return err
 		}
 		_, _ = fmt.Fprintf(m.out, "educates %s installed successfully.\n", version)
 	}
@@ -197,32 +193,57 @@ func (m *Manager) createSymlink(source, target string) error {
 	return nil
 }
 
-// downloadFile downloads a file from a URL to a local path
-func (m *Manager) downloadFile(url, outPath string) error {
+// installBinary downloads the binary at url into a temporary file next to
+// binaryPath, makes it executable and only then renames it to binaryPath,
+// replacing any binary already there. The temporary file is removed when
+// any step fails, so binaryPath holds either the previous binary or the
+// complete new one.
+func (m *Manager) installBinary(url, binaryPath string) (err error) {
+	dir := filepath.Dir(binaryPath)
+	// The leading dot keeps the temporary file out of the installed versions.
+	tmp, err := os.CreateTemp(dir, "."+filepath.Base(binaryPath)+"-*.download")
+	if err != nil {
+		return fmt.Errorf("failed to create a temporary file in %s: %w", dir, err)
+	}
+	defer func() {
+		_ = tmp.Close()
+		if err != nil {
+			_ = os.Remove(tmp.Name())
+		}
+	}()
+
+	_, _ = fmt.Fprintf(m.out, "Downloading %s...\n", url)
+	if err := m.download(url, tmp); err != nil {
+		return fmt.Errorf("failed to download binary (check your internet connection and try again): %w", err)
+	}
+
+	if err := tmp.Chmod(0o755); err != nil {
+		return fmt.Errorf("failed to set executable permissions on %s: %w", tmp.Name(), err)
+	}
+	if err := tmp.Sync(); err != nil {
+		return fmt.Errorf("failed to write %s: %w", tmp.Name(), err)
+	}
+	if err := tmp.Close(); err != nil {
+		return fmt.Errorf("failed to write %s: %w", tmp.Name(), err)
+	}
+	if err := os.Rename(tmp.Name(), binaryPath); err != nil {
+		return fmt.Errorf("failed to move the downloaded binary to %s: %w", binaryPath, err)
+	}
+	return nil
+}
+
+// download writes the body of a GET of url to w.
+func (m *Manager) download(url string, w io.Writer) error {
 	resp, err := http.Get(url)
 	if err != nil {
 		return err
 	}
-	defer func() {
-		if cerr := resp.Body.Close(); cerr != nil && err == nil {
-			err = fmt.Errorf("error closing response body: %w", cerr)
-		}
-	}()
+	defer func() { _ = resp.Body.Close() }()
 
-	if resp.StatusCode != 200 {
-		return fmt.Errorf("failed to download file: %s", resp.Status)
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("failed to download %s: %s", url, resp.Status)
 	}
 
-	out, err := os.Create(outPath)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if cerr := out.Close(); cerr != nil && err == nil {
-			err = fmt.Errorf("error closing output file: %w", cerr)
-		}
-	}()
-
-	_, err = io.Copy(out, resp.Body)
+	_, err = io.Copy(w, resp.Body)
 	return err
 }
