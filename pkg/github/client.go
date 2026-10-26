@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/educates/educatesenv/pkg/config"
+	"github.com/educates/educatesenv/pkg/releases"
 	"github.com/google/go-github/v93/github"
 )
 
@@ -95,11 +96,30 @@ func (c *Client) GetReleaseAssetURL(version, assetName string) (string, error) {
 	return "", fmt.Errorf("binary for %s is not available for your platform (%s). Please check supported platforms in the documentation", version, assetName)
 }
 
-// ListReleases returns all releases from the repository
-func (c *Client) ListReleases() ([]*github.RepositoryRelease, error) {
-	releases, _, err := c.client.Repositories.ListReleases(context.Background(), c.config.Github.Org, c.config.Github.Repository, &github.ListOptions{PerPage: 100})
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch releases: %w", err)
+// ListReleases returns every release of the repository, drafts included,
+// in the order GitHub lists them. It reads every page, 100 releases at a
+// time.
+func (c *Client) ListReleases() ([]releases.Release, error) {
+	var all []releases.Release
+	opts := &github.ListOptions{PerPage: 100}
+	for {
+		page, resp, err := c.client.Repositories.ListReleases(context.Background(), c.config.Github.Org, c.config.Github.Repository, opts)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch releases: %w", err)
+		}
+
+		for _, rel := range page {
+			all = append(all, releases.Release{
+				Tag:              rel.GetTagName(),
+				PublishedAt:      rel.GetPublishedAt().Time,
+				GitHubPrerelease: rel.GetPrerelease(),
+				Draft:            rel.GetDraft(),
+			})
+		}
+
+		if resp.NextPage == 0 {
+			return all, nil
+		}
+		opts.Page = resp.NextPage
 	}
-	return releases, nil
 }
