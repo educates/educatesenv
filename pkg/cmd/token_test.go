@@ -85,6 +85,34 @@ func TestTheTokenComesFromTheFirstSourceThatHasOne(t *testing.T) {
 	}
 }
 
+func TestAGHThatFailsPrintsNothingOrIsMissingGivesNoTokenSilently(t *testing.T) {
+	scripts := map[string]string{
+		"exits non-zero":         "printf 'gho_partial\\n'\nprintf 'gh: not logged in\\n' >&2\nexit 1",
+		"prints nothing":         "exit 0",
+		"prints only whitespace": "printf ' \\n'",
+		"is not on the PATH":     "",
+	}
+
+	for name, script := range scripts {
+		t.Run(name, func(t *testing.T) {
+			env := clitest.New(t)
+			env.GitHub.AddReleases(fakegithub.Release{Tag: "3.8.0"})
+			if script != "" {
+				env.FakeGH(script)
+			}
+
+			res := env.Run("list-remote")
+
+			require.NoError(t, res.Err)
+			assert.Empty(t, res.Stderr)
+			assert.NotContains(t, res.Stdout, "gho_partial")
+			for _, header := range authorizations(t, env) {
+				assert.Empty(t, header)
+			}
+		})
+	}
+}
+
 func TestWithoutATokenRequestsAreUnauthenticated(t *testing.T) {
 	env := clitest.New(t)
 	env.GitHub.AddReleases(fakegithub.Release{Tag: "3.8.0"})
