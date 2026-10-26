@@ -36,6 +36,8 @@ func newListRemoteCommand(d *deps) *cobra.Command {
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			out := cmd.OutOrStdout()
+
 			releases, err := d.gh.ListReleases()
 			if err != nil {
 				return fmt.Errorf("failed to fetch releases: %w", err)
@@ -60,13 +62,13 @@ func newListRemoteCommand(d *deps) *cobra.Command {
 			}
 
 			// Print versions
-			fmt.Println("Available versions:")
+			fmt.Fprintln(out, "Available versions:")
 			for _, version := range versions {
-				fmt.Printf("- %s\n", version)
+				fmt.Fprintf(out, "- %s\n", version)
 			}
 
 			if len(versions) == 0 {
-				fmt.Println("No versions found")
+				fmt.Fprintln(out, "No versions found")
 			}
 
 			return nil

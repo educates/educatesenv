@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 
 	"github.com/spf13/cobra"
 
@@ -35,8 +36,8 @@ type deps struct {
 }
 
 // load reads the configuration and creates the GitHub client and the
-// version manager.
-func (d *deps) load() error {
+// version manager, which reports progress to out.
+func (d *deps) load(out io.Writer) error {
 	d.cfg = config.New()
 	if err := d.cfg.Load(); err != nil {
 		return err
@@ -48,7 +49,7 @@ func (d *deps) load() error {
 		return err
 	}
 
-	d.manager = version.New(d.cfg, d.gh)
+	d.manager = version.New(d.cfg, d.gh, out)
 	return nil
 }
 
@@ -65,7 +66,7 @@ func NewRootCommand(opts ...Option) *cobra.Command {
 		Short: "Manage multiple versions of the educates binary",
 		Long:  `A version manager for educates, inspired by tfenv.`,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			if err := d.load(); err != nil {
+			if err := d.load(cmd.OutOrStdout()); err != nil {
 				return err
 			}
 
@@ -76,7 +77,7 @@ func NewRootCommand(opts ...Option) *cobra.Command {
 
 			// Validate development mode configuration
 			if err := d.manager.ValidateDevelopmentMode(); err != nil {
-				fmt.Printf("Warning: %v\n", err)
+				fmt.Fprintf(cmd.OutOrStdout(), "Warning: %v\n", err)
 			}
 			return nil
 		},

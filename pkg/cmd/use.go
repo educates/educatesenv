@@ -38,7 +38,7 @@ func newUseCommand(d *deps) *cobra.Command {
 					return fmt.Errorf("failed to switch to development version: %w", err)
 				}
 
-				fmt.Printf("Now using educates development version from %s\n", d.cfg.Development.BinaryLocation)
+				fmt.Fprintf(cmd.OutOrStdout(), "Now using educates development version from %s\n", d.cfg.Development.BinaryLocation)
 				return nil
 			}
 
@@ -47,7 +47,7 @@ func newUseCommand(d *deps) *cobra.Command {
 				return fmt.Errorf("version %s is not installed. You should install it first with `educatesenv install %s`", version, version)
 			}
 
-			fmt.Printf("Now using educates version %s\n", version)
+			fmt.Fprintf(cmd.OutOrStdout(), "Now using educates version %s\n", version)
 			return nil
 		},
 	}

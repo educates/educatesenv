@@ -23,47 +23,49 @@ func newInitCommand(d *deps) *cobra.Command {
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			out := cmd.OutOrStdout()
+
 			_, defaultBin, configPath, configCreated, err := config.CreateConfigAndFolders()
 			if err != nil {
 				return err
 			}
 
 			if configCreated {
-				fmt.Printf("Config file created at %s\n", configPath)
+				fmt.Fprintf(out, "Config file created at %s\n", configPath)
 			} else {
-				fmt.Printf("Config file already exists at %s\n", configPath)
+				fmt.Fprintf(out, "Config file already exists at %s\n", configPath)
 			}
-			fmt.Printf("Bin directory ensured at %s\n", defaultBin)
+			fmt.Fprintf(out, "Bin directory ensured at %s\n", defaultBin)
 
 			// Print PATH instructions
-			fmt.Println("\nTo use educatesenv, add the bin directory to your PATH:")
+			fmt.Fprintln(out, "\nTo use educatesenv, add the bin directory to your PATH:")
 			var pathCmd string
 			switch runtime.GOOS {
 			case platform.Darwin, platform.Linux:
 				pathCmd = fmt.Sprintf("echo 'export PATH=\"%s:$PATH\"' >> ~/.bashrc\nsource ~/.bashrc", defaultBin)
-				fmt.Printf("\nFor bash/zsh, run:\n  %s\n", pathCmd)
-				fmt.Printf("\nFor fish shell, run:\n  set -U fish_user_paths %s $fish_user_paths\n", defaultBin)
+				fmt.Fprintf(out, "\nFor bash/zsh, run:\n  %s\n", pathCmd)
+				fmt.Fprintf(out, "\nFor fish shell, run:\n  set -U fish_user_paths %s $fish_user_paths\n", defaultBin)
 			case platform.Windows:
-				fmt.Printf("\nFor Windows (PowerShell), run:\n  [Environment]::SetEnvironmentVariable(\"Path\", \"%s;\" + $Env:Path, [EnvironmentVariableTarget]::User)\n", defaultBin)
+				fmt.Fprintf(out, "\nFor Windows (PowerShell), run:\n  [Environment]::SetEnvironmentVariable(\"Path\", \"%s;\" + $Env:Path, [EnvironmentVariableTarget]::User)\n", defaultBin)
 			default:
-				fmt.Printf("\nAdd %s to your PATH manually.\n", defaultBin)
+				fmt.Fprintf(out, "\nAdd %s to your PATH manually.\n", defaultBin)
 			}
-			fmt.Println("\nRestart your terminal or source your profile to apply the changes.")
+			fmt.Fprintln(out, "\nRestart your terminal or source your profile to apply the changes.")
 
 			if downloadLatest {
-				fmt.Println("\nFetching latest educates version...")
+				fmt.Fprintln(out, "\nFetching latest educates version...")
 				latest, err := d.gh.GetLatestReleaseVersion()
 				if err != nil {
 					return fmt.Errorf("failed to get latest release version: %w", err)
 				}
-				fmt.Printf("Latest version: %s\n", latest)
+				fmt.Fprintf(out, "Latest version: %s\n", latest)
 
 				if err := d.manager.InstallVersion(latest, overwrite, true); err != nil {
 					return err
 				}
 			} else {
-				fmt.Println("\nRun 'educatesenv install <version>' to install a specific version")
-				fmt.Println("Run 'educatesenv list-remote' to see available versions")
+				fmt.Fprintln(out, "\nRun 'educatesenv install <version>' to install a specific version")
+				fmt.Fprintln(out, "Run 'educatesenv list-remote' to see available versions")
 			}
 			return nil
 		},
