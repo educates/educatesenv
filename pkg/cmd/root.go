@@ -53,6 +53,16 @@ func (d *deps) load(out io.Writer) error {
 	return nil
 }
 
+// cleanUpDevelopmentSymlink removes the educates symlink when it points
+// at a development binary while development mode is disabled, and warns
+// about it. Only the commands that deal with the active binary run it,
+// as their PreRun hook.
+func (d *deps) cleanUpDevelopmentSymlink(cmd *cobra.Command, _ []string) {
+	if err := d.manager.ValidateDevelopmentMode(); err != nil {
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Warning: %v\n", err)
+	}
+}
+
 // NewRootCommand builds the educatesenv command tree. Each call builds a
 // new tree with its own flag values and dependencies.
 func NewRootCommand(opts ...Option) *cobra.Command {
@@ -66,20 +76,7 @@ func NewRootCommand(opts ...Option) *cobra.Command {
 		Short: "Manage multiple versions of the educates binary",
 		Long:  `A version manager for educates, inspired by tfenv.`,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			if err := d.load(cmd.OutOrStdout()); err != nil {
-				return err
-			}
-
-			// Skip validation for help command
-			if cmd.Name() == "help" {
-				return nil
-			}
-
-			// Validate development mode configuration
-			if err := d.manager.ValidateDevelopmentMode(); err != nil {
-				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Warning: %v\n", err)
-			}
-			return nil
+			return d.load(cmd.OutOrStdout())
 		},
 	}
 
