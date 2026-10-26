@@ -5,7 +5,7 @@ package releases
 // tags that are not semver never count. Neither the order of all nor
 // publish times matter. ok is false when all holds no stable release.
 func Latest(all []Release) (latest Release, ok bool) {
-	chosen, _ := Select(all, Options{Limit: 1, Order: BySemver})
+	chosen, _ := Select(all, SelectOptions{Limit: 1, Order: BySemver})
 	if len(chosen) == 0 {
 		return Release{}, false
 	}

@@ -16,6 +16,7 @@ func TestCommandsWithoutArgumentsRejectStrayOnes(t *testing.T) {
 		{"list"},
 		{"list-local"},
 		{"init"},
+		{"config"},
 		{"config", "init"},
 		{"config", "view"},
 		{"version"},

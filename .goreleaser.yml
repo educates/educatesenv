@@ -107,9 +107,15 @@ notarize:
   macos:
     - # Whether this configuration is enabled or not.
       #
+      # A release always signs, so it fails when MACOS_SIGN_P12 is empty or
+      # missing, as well as when signing fails. Only --skip=notarize, which
+      # the release workflow's skip-signing input passes, releases unsigned.
+      # A snapshot build signs only when MACOS_SIGN_P12 is set, so that
+      # snapshots build without the certificate.
+      #
       # Default: false.
       # Templates: allowed.
-      enabled: '{{ isEnvSet "MACOS_SIGN_P12" }}'
+      enabled: '{{ or (not .IsSnapshot) (isEnvSet "MACOS_SIGN_P12") }}'
 
       # Before notarizing, we need to sign the binary.
       # This block defines the configuration for doing so.

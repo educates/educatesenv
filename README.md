@@ -227,7 +227,9 @@ educatesenv use 3.7.3
 `use` points the `educates` symlink at an installed version. When the
 version is not installed, it says so and how to install it; any other
 failure, such as a bin directory it cannot write to, is reported with its
-cause. `use develop` selects the development binary, as described under
+cause. `use` does not resolve `latest`: to install the latest stable
+release and switch to it, run `educatesenv install latest --use`.
+`use develop` selects the development binary, as described under
 [Development mode](#development-mode).
 
 ### Listing installed versions
@@ -308,8 +310,10 @@ empty one counts as not set:
 | `EDUCATES_DEVELOPMENT_BINARY_LOCATION` | `development.binaryLocation` |
 
 Booleans take `true` or `false`, and the other forms Go's
-`strconv.ParseBool` accepts, such as `1` and `0`. A value that is not a
-boolean is an error that names the variable or key.
+`strconv.ParseBool` accepts, such as `1` and `0`. In the config file, a
+number other than `0` is true as well. A value in any other form, such
+as `yes`, reads as false, and educatesenv prints a warning on stderr that
+names the key and file, or the variable.
 
 ### GitHub token
 
@@ -473,10 +477,14 @@ repository secrets:
 | `MACOS_NOTARY_KEY_ID` | the ID of the `.p8` key |
 | `MACOS_NOTARY_ISSUER_ID` | the issuer UUID of the `.p8` key |
 
-GoReleaser signs only when `MACOS_SIGN_P12` is set, so keep that secret
-in place. With it set, a release from a tag push always signs, and the
-run fails before anything is published when signing or the notarization
-submission fails.
+A release from a tag push always signs the macOS binaries. The run fails
+before anything is published when `MACOS_SIGN_P12` is empty or missing,
+when signing fails, or when the notarization submission fails. When any
+of the three `MACOS_NOTARY_*` secrets is empty, GoReleaser signs the
+binaries without submitting them for notarization. Only the manual
+trigger's `skip-signing` input, described below, releases unsigned. A
+snapshot build, such as `goreleaser release --snapshot --clean`, signs
+only when `MACOS_SIGN_P12` is set, so it builds without the certificate.
 
 ### Publishing the draft
 

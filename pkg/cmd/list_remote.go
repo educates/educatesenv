@@ -45,7 +45,7 @@ highest version first.`,
 				return err
 			}
 
-			opts := releases.Options{IncludePrereleases: preReleases, Limit: recent}
+			opts := releases.SelectOptions{IncludePrereleases: preReleases, Limit: recent}
 			if all {
 				opts.Limit = releases.All
 			}

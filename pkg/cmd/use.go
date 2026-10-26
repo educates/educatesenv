@@ -7,21 +7,23 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+
+	"github.com/educates/educatesenv/pkg/version"
 )
 
 func newUseCommand(d *deps) *cobra.Command {
 	return &cobra.Command{
-		Use:           "use [version|develop]",
+		Use:           "use <version|develop>",
 		Short:         "Switch to a specific educates version",
 		Args:          cobra.ExactArgs(1),
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		PreRun:        d.cleanUpDevelopmentSymlink,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			version := args[0]
+			name := args[0]
 
 			// Handle development version
-			if version == "develop" {
+			if name == version.Develop {
 				if !d.cfg.Development.Enabled {
 					return fmt.Errorf("development mode is not enabled. Enable it in the config file by setting development.enabled to true")
 				}
@@ -37,7 +39,7 @@ func newUseCommand(d *deps) *cobra.Command {
 					return fmt.Errorf("failed to check development binary: %w", err)
 				}
 
-				if err := d.manager.UseVersion(version); err != nil {
+				if err := d.manager.UseVersion(name); err != nil {
 					return fmt.Errorf("failed to switch to development version: %w", err)
 				}
 
@@ -46,14 +48,20 @@ func newUseCommand(d *deps) *cobra.Command {
 			}
 
 			// Handle regular version
-			if err := d.manager.UseVersion(version); err != nil {
-				if errors.Is(err, fs.ErrNotExist) {
-					return fmt.Errorf("version %s is not installed. You should install it first with `educatesenv install %s`", version, version)
+			if err := d.manager.UseVersion(name); err != nil {
+				switch {
+				// install resolves latest to a version, while use only
+				// switches to a version that is installed.
+				case errors.Is(err, fs.ErrNotExist) && name == version.Latest:
+					return fmt.Errorf("use takes an installed version, not %[1]s. "+
+						"Run 'educatesenv install %[1]s --use' to install the latest stable release and switch to it", version.Latest)
+				case errors.Is(err, fs.ErrNotExist):
+					return fmt.Errorf("version %s is not installed. You should install it first with 'educatesenv install %s'", name, name)
 				}
-				return fmt.Errorf("failed to switch to version %s: %w", version, err)
+				return fmt.Errorf("failed to switch to version %s: %w", name, err)
 			}
 
-			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Now using educates version %s\n", version)
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Now using educates version %s\n", name)
 			return nil
 		},
 	}

@@ -2,12 +2,10 @@ package cmd
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
-	"strings"
 
 	"github.com/educates/educatesenv/pkg/config"
 	"github.com/educates/educatesenv/pkg/releases"
+	"github.com/educates/educatesenv/pkg/version"
 	"github.com/spf13/cobra"
 )
 
@@ -29,26 +27,12 @@ func runList(d *deps) func(cmd *cobra.Command, args []string) error {
 		cfg := d.cfg
 		out := cmd.OutOrStdout()
 
-		// Get all files in the bin directory
-		files, err := os.ReadDir(cfg.Local.Dir)
-		// If the bin directory doesn't exist call init
+		versions, activeVersion, err := d.manager.Installed()
+		// If the bin directory cannot be read, create the default config
+		// and bin directory, as init does
 		if err != nil {
 			if _, _, err := config.CreateDefault(); err != nil {
 				return fmt.Errorf("you should run `educatesenv init` first")
-			}
-		}
-
-		// Get the active version by reading the symlink
-		activeVersion := ""
-		isDevelopmentActive := false
-		symlink := filepath.Join(cfg.Local.Dir, "educates")
-		if target, err := os.Readlink(symlink); err == nil {
-			// Check if the active version is a development version
-			if cfg.Development.Enabled && target == cfg.Development.BinaryLocation {
-				isDevelopmentActive = true
-			} else {
-				activeVersion = filepath.Base(target)
-				activeVersion = strings.TrimPrefix(activeVersion, "educates-")
 			}
 		}
 
@@ -57,7 +41,7 @@ func runList(d *deps) func(cmd *cobra.Command, args []string) error {
 
 		// Show development version if enabled
 		if cfg.Development.Enabled {
-			if isDevelopmentActive {
+			if activeVersion == version.Develop {
 				_, _ = fmt.Fprintf(out, "* develop (active) -> %s\n", cfg.Development.BinaryLocation)
 			} else {
 				_, _ = fmt.Fprintf(out, "  develop -> %s\n", cfg.Development.BinaryLocation)
@@ -65,20 +49,11 @@ func runList(d *deps) func(cmd *cobra.Command, args []string) error {
 		}
 
 		// Print regular versions, newest first
-		var versions []string
-		for _, file := range files {
-			if file.IsDir() || file.Name() == "educates" {
-				continue
-			}
-			if version, ok := strings.CutPrefix(file.Name(), "educates-"); ok {
-				versions = append(versions, version)
-			}
-		}
-		for _, version := range releases.SortInstalled(versions) {
-			if version == activeVersion {
-				_, _ = fmt.Fprintf(out, "* %s (active)\n", version)
+		for _, name := range releases.SortInstalled(versions) {
+			if name == activeVersion {
+				_, _ = fmt.Fprintf(out, "* %s (active)\n", name)
 			} else {
-				_, _ = fmt.Fprintf(out, "  %s\n", version)
+				_, _ = fmt.Fprintf(out, "  %s\n", name)
 			}
 		}
 

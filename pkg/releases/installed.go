@@ -19,7 +19,7 @@ func SortInstalled(names []string) []string {
 		aIsSemver, bIsSemver := isSemver(a), isSemver(b)
 		switch {
 		case aIsSemver && bIsSemver:
-			if c := semver.Compare(version(b), version(a)); c != 0 {
+			if c := semver.Compare(semverForm(b), semverForm(a)); c != 0 {
 				return c
 			}
 			return strings.Compare(a, b)

@@ -37,9 +37,9 @@ func newInitCommand(d *deps) *cobra.Command {
 			defaultBin := paths.BinDir
 
 			if configCreated {
-				_, _ = fmt.Fprintf(out, "Config file created at %s\n", paths.File)
+				_, _ = fmt.Fprintf(out, "Config file created at %s\n", paths.ConfigFile)
 			} else {
-				_, _ = fmt.Fprintf(out, "Config file already exists at %s\n", paths.File)
+				_, _ = fmt.Fprintf(out, "Config file already exists at %s\n", paths.ConfigFile)
 			}
 			_, _ = fmt.Fprintf(out, "Bin directory ensured at %s\n", defaultBin)
 

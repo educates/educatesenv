@@ -12,6 +12,15 @@ import (
 	"github.com/educates/educatesenv/internal/clitest"
 )
 
+func TestUseShowsItsRequiredArgumentInItsUsage(t *testing.T) {
+	env := clitest.New(t)
+
+	res := env.Run("use", "--help")
+
+	require.NoError(t, res.Err)
+	assert.Contains(t, res.Stdout, "Usage:\n  educatesenv use <version|develop> [flags]\n")
+}
+
 func TestUseActivatesAnInstalledVersion(t *testing.T) {
 	env := clitest.New(t)
 	env.WriteBinary("3.7.0")
@@ -35,8 +44,23 @@ func TestUseOfAVersionThatIsNotInstalledSaysHowToInstallIt(t *testing.T) {
 
 	res := env.Run("use", "3.9.0")
 
-	require.EqualError(t, res.Err, "version 3.9.0 is not installed. You should install it first with `educatesenv install 3.9.0`")
+	require.EqualError(t, res.Err, "version 3.9.0 is not installed. You should install it first with 'educatesenv install 3.9.0'")
 	assert.Empty(t, res.Stdout)
+	target, err := os.Readlink(env.ActiveLink())
+	require.NoError(t, err)
+	assert.Equal(t, "educates-3.8.0", target)
+}
+
+func TestUseLatestSaysHowToInstallAndUseTheLatestRelease(t *testing.T) {
+	env := clitest.New(t)
+	env.WriteBinary("3.8.0")
+	require.NoError(t, os.Symlink("educates-3.8.0", env.ActiveLink()))
+
+	res := env.Run("use", "latest")
+
+	require.EqualError(t, res.Err, "use takes an installed version, not latest. Run 'educatesenv install latest --use' to install the latest stable release and switch to it")
+	assert.Empty(t, res.Stdout)
+	assert.Empty(t, env.GitHub.Requests())
 	target, err := os.Readlink(env.ActiveLink())
 	require.NoError(t, err)
 	assert.Equal(t, "educates-3.8.0", target)

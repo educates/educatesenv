@@ -69,12 +69,12 @@ func (c *Config) File() string {
 type Paths struct {
 	// Home is the user's home directory.
 	Home string
-	// Dir is the educatesenv directory in Home.
-	Dir string
+	// ConfigDir is the educatesenv directory in Home.
+	ConfigDir string
 	// BinDir is the default directory installed versions go in.
 	BinDir string
-	// File is the config file in Dir.
-	File string
+	// ConfigFile is the config file in ConfigDir.
+	ConfigFile string
 }
 
 // homePaths returns the paths in the user's home directory.
@@ -88,12 +88,12 @@ func homePaths() (Paths, error) {
 
 // pathsIn returns the paths in home.
 func pathsIn(home string) Paths {
-	dir := filepath.Join(home, ConfigDirName)
+	configDir := filepath.Join(home, ConfigDirName)
 	return Paths{
-		Home:   home,
-		Dir:    dir,
-		BinDir: filepath.Join(dir, "bin"),
-		File:   filepath.Join(dir, ConfigFileName),
+		Home:       home,
+		ConfigDir:  configDir,
+		BinDir:     filepath.Join(configDir, "bin"),
+		ConfigFile: filepath.Join(configDir, ConfigFileName),
 	}
 }
 
@@ -117,27 +117,27 @@ func defaults(paths Paths) *Config {
 // empty string counts as not set. The GitHub token is not among them: the
 // token package reads EDUCATES_GITHUB_TOKEN.
 //
+// A boolean value in none of the forms boolOf accepts reads as false, and
+// Load writes a warning that names the value's key and file, or its
+// environment variable, to errOut, instead of failing.
+//
 // Without a home directory, Load writes a warning to out, reads no config
 // file, and puts the bin directory under the current directory.
-func Load(out io.Writer) (*Config, error) {
+func Load(out, errOut io.Writer) (*Config, error) {
 	paths, err := homePaths()
 	if err != nil {
 		_, _ = fmt.Fprintln(out, "Warning: could not determine home directory, using current directory for bin folder.")
 		cfg := defaults(pathsIn("."))
-		if err := cfg.applyEnv(); err != nil {
-			return nil, err
-		}
+		cfg.applyEnv(errOut)
 		return cfg, nil
 	}
 
 	cfg := defaults(paths)
-	cfg.file = paths.File
-	if err := cfg.applyFile(paths.File); err != nil {
+	cfg.file = paths.ConfigFile
+	if err := cfg.applyFile(paths.ConfigFile, errOut); err != nil {
 		return nil, err
 	}
-	if err := cfg.applyEnv(); err != nil {
-		return nil, err
-	}
+	cfg.applyEnv(errOut)
 	return cfg, nil
 }
 
@@ -165,9 +165,20 @@ func (c *Config) settings() []setting {
 	}
 }
 
+// boolWarning is the warning for a boolean value that reads as false
+// because boolOf does not accept it. Its verbs are where the value is set
+// and what is wrong with it.
+const boolWarning = "Warning: %s %s, so it is read as false. Set it to true or false.\n"
+
+// notABoolean says that value is not a boolean, for boolWarning.
+func notABoolean(value string) string {
+	return fmt.Sprintf("is %q, which is not a boolean", value)
+}
+
 // applyEnv sets every value whose environment variable is set and not
-// empty.
-func (c *Config) applyEnv() error {
+// empty, and writes a warning to warnings for each boolean that reads as
+// false because boolOf does not accept it.
+func (c *Config) applyEnv(warnings io.Writer) {
 	for _, s := range c.settings() {
 		if s.env == "" {
 			continue
@@ -180,18 +191,19 @@ func (c *Config) applyEnv() error {
 			*s.str = value
 			continue
 		}
-		b, err := parseBool(value)
-		if err != nil {
-			return fmt.Errorf("%s: %w", s.env, err)
+		b, ok := boolOf(value)
+		if !ok {
+			_, _ = fmt.Fprintf(warnings, boolWarning, s.env, notABoolean(value))
 		}
 		*s.boolean = b
 	}
-	return nil
 }
 
-// applyFile sets every value the config file at path sets. A missing file
-// sets nothing, and so does a key whose value is null.
-func (c *Config) applyFile(path string) error {
+// applyFile sets every value the config file at path sets, and writes a
+// warning to warnings for each boolean that reads as false because boolOf
+// does not accept it. A missing file sets nothing, and so does a key whose
+// value is null.
+func (c *Config) applyFile(path string, warnings io.Writer) error {
 	values, err := readFile(path)
 	if err != nil {
 		return err
@@ -202,18 +214,22 @@ func (c *Config) applyFile(path string) error {
 		if !ok || n.ShortTag() == "!!null" {
 			continue
 		}
+		if s.boolean != nil {
+			b, ok := fileBool(n)
+			if !ok {
+				problem := "is not a single value"
+				if n.Kind == yaml.ScalarNode {
+					problem = notABoolean(n.Value)
+				}
+				_, _ = fmt.Fprintf(warnings, boolWarning, s.key+" in "+path, problem)
+			}
+			*s.boolean = b
+			continue
+		}
 		if n.Kind != yaml.ScalarNode {
 			return fmt.Errorf("%s in %s: expected a single value", s.key, path)
 		}
-		if s.str != nil {
-			*s.str = n.Value
-			continue
-		}
-		b, err := fileBool(n)
-		if err != nil {
-			return fmt.Errorf("%s in %s: %w", s.key, path, err)
-		}
-		*s.boolean = b
+		*s.str = n.Value
 	}
 	return nil
 }
@@ -268,29 +284,40 @@ func resolve(n *yaml.Node) *yaml.Node {
 	return n
 }
 
-// parseBool parses the boolean forms strconv.ParseBool accepts: 1, t, T,
-// TRUE, true, True, 0, f, F, FALSE, false and False.
-func parseBool(value string) (bool, error) {
-	b, err := strconv.ParseBool(value)
-	if err != nil {
-		return false, fmt.Errorf("%q is not a boolean; use true or false", value)
+// boolOf reads value as a boolean: a bool as itself, a number as true when
+// it is not zero, and a string in the forms strconv.ParseBool accepts: 1,
+// t, T, TRUE, true, True, 0, f, F, FALSE, false and False. Any other value
+// reads as false, and ok is false. These are the forms and the readings of
+// viper's GetBool, so a config written for educatesenv 1.0 reads the same.
+func boolOf(value any) (b, ok bool) {
+	switch v := value.(type) {
+	case bool:
+		return v, true
+	case int:
+		return v != 0, true
+	case int64:
+		return v != 0, true
+	case uint64:
+		return v != 0, true
+	case float64:
+		return v != 0, true
+	case string:
+		b, err := strconv.ParseBool(v)
+		return b, err == nil
+	default:
+		return false, false
 	}
-	return b, nil
 }
 
-// fileBool parses a boolean from the config file. A number is true when it
-// is not zero, and anything else takes the forms parseBool accepts.
-func fileBool(n *yaml.Node) (bool, error) {
-	switch n.ShortTag() {
-	case "!!int", "!!float":
-		var f float64
-		if err := n.Decode(&f); err != nil {
-			return false, fmt.Errorf("%q is not a boolean; use true or false", n.Value)
-		}
-		return f != 0, nil
-	default:
-		return parseBool(n.Value)
+// fileBool reads a boolean from the config file by boolOf, from the value
+// YAML decodes n to: a bool for true or false, a number for an integer or
+// a float, and a string for any other single value, such as yes or on.
+func fileBool(n *yaml.Node) (b, ok bool) {
+	var value any
+	if err := n.Decode(&value); err != nil {
+		return false, false
 	}
+	return boolOf(value)
 }
 
 // CreateDefault creates the educatesenv directory in the user's home
@@ -313,7 +340,7 @@ func CreateDefault() (Paths, bool, error) {
 		return paths, false, fmt.Errorf("failed to marshal config to YAML: %w", err)
 	}
 
-	f, err := os.OpenFile(paths.File, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	f, err := os.OpenFile(paths.ConfigFile, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 	if errors.Is(err, fs.ErrExist) {
 		return paths, false, nil
 	}
@@ -325,7 +352,7 @@ func CreateDefault() (Paths, bool, error) {
 		err = closeErr
 	}
 	if err != nil {
-		_ = os.Remove(paths.File)
+		_ = os.Remove(paths.ConfigFile)
 		return paths, false, fmt.Errorf("failed to write config file: %w", err)
 	}
 	return paths, true, nil

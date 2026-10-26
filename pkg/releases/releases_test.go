@@ -59,7 +59,7 @@ func TestSelectLeavesOutPrereleasesUnlessIncluded(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			chosen, candidates := releases.Select(all, releases.Options{
+			chosen, candidates := releases.Select(all, releases.SelectOptions{
 				IncludePrereleases: tt.includePrereleases,
 				Limit:              releases.All,
 			})
@@ -84,7 +84,7 @@ func TestSelectNeverChoosesDraftsOrTagsThatAreNotSemver(t *testing.T) {
 		stable("3.6.0"),
 	}
 
-	chosen, candidates := releases.Select(all, releases.Options{
+	chosen, candidates := releases.Select(all, releases.SelectOptions{
 		IncludePrereleases: true,
 		Limit:              releases.All,
 	})
@@ -106,7 +106,7 @@ func TestSelectByPublishTimeOrdersNewestFirst(t *testing.T) {
 		{Tag: "4.0.0-alpha.13", PublishedAt: at(27, 9)},
 	}
 
-	chosen, _ := releases.Select(all, releases.Options{
+	chosen, _ := releases.Select(all, releases.SelectOptions{
 		IncludePrereleases: true,
 		Limit:              releases.All,
 		Order:              releases.ByPublishTime,
@@ -137,43 +137,43 @@ func TestSelectCombinesPrereleasesLimitAndOrder(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		opts       releases.Options
+		opts       releases.SelectOptions
 		want       []string
 		candidates int
 	}{
 		{
 			name:       "stable, 3, by semver",
-			opts:       releases.Options{Limit: 3, Order: releases.BySemver},
+			opts:       releases.SelectOptions{Limit: 3, Order: releases.BySemver},
 			want:       []string{"3.8.0", "3.7.4", "3.7.3"},
 			candidates: 4,
 		},
 		{
 			name:       "stable, all, by semver",
-			opts:       releases.Options{Limit: releases.All, Order: releases.BySemver},
+			opts:       releases.SelectOptions{Limit: releases.All, Order: releases.BySemver},
 			want:       []string{"3.8.0", "3.7.4", "3.7.3", "3.6.0"},
 			candidates: 4,
 		},
 		{
 			name:       "stable, 3, by publish time",
-			opts:       releases.Options{Limit: 3, Order: releases.ByPublishTime},
+			opts:       releases.SelectOptions{Limit: 3, Order: releases.ByPublishTime},
 			want:       []string{"3.7.4", "3.8.0", "3.7.3"},
 			candidates: 4,
 		},
 		{
 			name:       "stable, all, by publish time",
-			opts:       releases.Options{Limit: releases.All, Order: releases.ByPublishTime},
+			opts:       releases.SelectOptions{Limit: releases.All, Order: releases.ByPublishTime},
 			want:       []string{"3.7.4", "3.8.0", "3.7.3", "3.6.0"},
 			candidates: 4,
 		},
 		{
 			name:       "with pre-releases, 3, by semver",
-			opts:       releases.Options{IncludePrereleases: true, Limit: 3, Order: releases.BySemver},
+			opts:       releases.SelectOptions{IncludePrereleases: true, Limit: 3, Order: releases.BySemver},
 			want:       []string{"4.0.0-alpha.13", "4.0.0-alpha.2", "3.8.1-rc.2"},
 			candidates: 8,
 		},
 		{
 			name: "with pre-releases, all, by semver",
-			opts: releases.Options{IncludePrereleases: true, Limit: releases.All, Order: releases.BySemver},
+			opts: releases.SelectOptions{IncludePrereleases: true, Limit: releases.All, Order: releases.BySemver},
 			want: []string{
 				"4.0.0-alpha.13", "4.0.0-alpha.2", "3.8.1-rc.2", "3.8.0",
 				"3.8.0-rc.13", "3.7.4", "3.7.3", "3.6.0",
@@ -182,13 +182,13 @@ func TestSelectCombinesPrereleasesLimitAndOrder(t *testing.T) {
 		},
 		{
 			name:       "with pre-releases, 3, by publish time",
-			opts:       releases.Options{IncludePrereleases: true, Limit: 3, Order: releases.ByPublishTime},
+			opts:       releases.SelectOptions{IncludePrereleases: true, Limit: 3, Order: releases.ByPublishTime},
 			want:       []string{"3.7.4", "3.8.1-rc.2", "4.0.0-alpha.13"},
 			candidates: 8,
 		},
 		{
 			name: "with pre-releases, all, by publish time",
-			opts: releases.Options{IncludePrereleases: true, Limit: releases.All, Order: releases.ByPublishTime},
+			opts: releases.SelectOptions{IncludePrereleases: true, Limit: releases.All, Order: releases.ByPublishTime},
 			want: []string{
 				"3.7.4", "3.8.1-rc.2", "4.0.0-alpha.13", "3.8.0",
 				"3.8.0-rc.13", "3.7.3", "4.0.0-alpha.2", "3.6.0",
@@ -197,19 +197,19 @@ func TestSelectCombinesPrereleasesLimitAndOrder(t *testing.T) {
 		},
 		{
 			name:       "a limit above the number of candidates",
-			opts:       releases.Options{Limit: 10},
+			opts:       releases.SelectOptions{Limit: 10},
 			want:       []string{"3.8.0", "3.7.4", "3.7.3", "3.6.0"},
 			candidates: 4,
 		},
 		{
 			name:       "a limit equal to the number of candidates",
-			opts:       releases.Options{Limit: 4},
+			opts:       releases.SelectOptions{Limit: 4},
 			want:       []string{"3.8.0", "3.7.4", "3.7.3", "3.6.0"},
 			candidates: 4,
 		},
 		{
 			name:       "a negative limit",
-			opts:       releases.Options{Limit: -1},
+			opts:       releases.SelectOptions{Limit: -1},
 			want:       []string{"3.8.0", "3.7.4", "3.7.3", "3.6.0"},
 			candidates: 4,
 		},
@@ -228,7 +228,7 @@ func TestSelectCombinesPrereleasesLimitAndOrder(t *testing.T) {
 func TestSelectLeavesItsInputAlone(t *testing.T) {
 	all := []releases.Release{stable("3.7.0"), stable("3.9.0-rc.1"), stable("3.8.0")}
 
-	_, _ = releases.Select(all, releases.Options{Limit: 1})
+	_, _ = releases.Select(all, releases.SelectOptions{Limit: 1})
 
 	assert.Equal(t, []string{"3.7.0", "3.9.0-rc.1", "3.8.0"}, tags(all))
 }
@@ -263,7 +263,7 @@ func TestSelectOrdersBySemverHighestFirst(t *testing.T) {
 				all = append(all, stable(tag))
 			}
 
-			chosen, _ := releases.Select(all, releases.Options{
+			chosen, _ := releases.Select(all, releases.SelectOptions{
 				IncludePrereleases: true,
 				Limit:              releases.All,
 				Order:              releases.BySemver,

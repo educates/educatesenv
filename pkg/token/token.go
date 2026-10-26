@@ -11,11 +11,11 @@ import (
 	"strings"
 )
 
-// source is where a token came from.
-type source int
+// tokenSource is where a token came from.
+type tokenSource int
 
 const (
-	notSet source = iota
+	notSet tokenSource = iota
 	educatesGitHubToken
 	ghToken
 	githubToken
@@ -23,8 +23,8 @@ const (
 	configFile
 )
 
-// labels name each source in config view and in error messages.
-var labels = map[source]string{
+// sourceLabels name each source in config view and in error messages.
+var sourceLabels = map[tokenSource]string{
 	notSet:              "not set",
 	educatesGitHubToken: "EDUCATES_GITHUB_TOKEN",
 	ghToken:             "GH_TOKEN",
@@ -33,27 +33,31 @@ var labels = map[source]string{
 	configFile:          "config file (deprecated)",
 }
 
-// environment holds the environment variables that hold a token, in the
+// tokenVariables are the environment variables that hold a token, in the
 // order they are checked.
-var environment = []struct {
+var tokenVariables = []struct {
 	variable string
-	source   source
+	source   tokenSource
 }{
 	{"EDUCATES_GITHUB_TOKEN", educatesGitHubToken},
 	{"GH_TOKEN", ghToken},
 	{"GITHUB_TOKEN", githubToken},
 }
 
+// AuthenticationHint tells the user how to give educatesenv a token. It
+// starts a sentence that each message finishes in its own way.
+const AuthenticationHint = "Set GH_TOKEN or run 'gh auth login'"
+
 // configFileWarning is the warning for a token from the config file. Its
 // verb is the file's path.
 const configFileWarning = "Warning: github.token in %s is deprecated, and a later release will stop reading it. " +
-	"Set GH_TOKEN or run 'gh auth login' instead, and remove the token from that file.\n"
+	AuthenticationHint + " instead, and remove the token from that file.\n"
 
 // Token is a GitHub token and the source it came from. Formatting a Token
 // with %s or %v shows its source, never any character of the token.
 type Token struct {
 	value  string
-	source source
+	source tokenSource
 }
 
 // Value returns the token, or "" when no source has one.
@@ -70,7 +74,7 @@ func (t Token) IsSet() bool {
 // GH_TOKEN, GITHUB_TOKEN, gh auth token, config file (deprecated), or not
 // set.
 func (t Token) Source() string {
-	return labels[t.source]
+	return sourceLabels[t.source]
 }
 
 // String returns how config view shows the token: <set via GH_TOKEN> and
@@ -99,7 +103,7 @@ func (t Token) String() string {
 // deprecated, so Resolve writes a warning that names the file to warnings
 // when it returns one.
 func Resolve(file, fileToken string, warnings io.Writer) Token {
-	for _, e := range environment {
+	for _, e := range tokenVariables {
 		if value := os.Getenv(e.variable); value != "" {
 			return Token{value: value, source: e.source}
 		}

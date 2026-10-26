@@ -42,8 +42,9 @@ jobs:
       uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
       with:
         version: v2.19.0
-        # Only a manual run can skip signing; releases from tag pushes always
-        # sign, and fail when signing fails.
+        # Only a manual run can skip signing. Every other release signs, and
+        # .goreleaser.yml makes it fail when MACOS_SIGN_P12 is empty or
+        # signing fails.
         args: release --clean${{ github.event_name == 'workflow_dispatch' && inputs.skip-signing && ' --skip=notarize' || '' }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
