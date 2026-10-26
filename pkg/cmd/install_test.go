@@ -142,3 +142,17 @@ func TestInstallOverwriteWithAChecksumMismatchKeepsTheInstalledBinary(t *testing
 	assert.Equal(t, os.FileMode(0o755), info.Mode().Perm())
 	assert.ElementsMatch(t, []string{"educates", "educates-3.8.0"}, binDirEntries(t, env))
 }
+
+func TestInstallFailsWhenChecksumsTxtHasNoEntryForTheBinary(t *testing.T) {
+	env := clitest.New(t)
+	env.GitHub.AddReleases(fakegithub.Release{Tag: "3.8.0", Assets: []fakegithub.Asset{
+		clitest.PlatformBinary([]byte("educates 3.8.0 binary")),
+		{Name: "checksums.txt", Content: []byte(releasedSum + "  educates-plan9-mips\n")},
+	}})
+
+	res := env.Run("install", "3.8.0")
+
+	require.Error(t, res.Err)
+	assert.Contains(t, res.Err.Error(), "failed to install version 3.8.0: checksums.txt has no entry for "+clitest.PlatformBinaryName())
+	assert.Empty(t, binDirEntries(t, env))
+}

@@ -213,7 +213,10 @@ func (m *Manager) releasedChecksum(assetName, checksumsURL string) (string, erro
 	if err := m.download(checksumsURL, &checksums); err != nil {
 		return "", fmt.Errorf("failed to download %s (check your internet connection and try again): %w", github.ChecksumsAssetName, err)
 	}
-	sum, _ := findChecksum(checksums.String(), assetName)
+	sum, ok := findChecksum(checksums.String(), assetName)
+	if !ok {
+		return "", fmt.Errorf("%s has no entry for %s, so the binary cannot be verified as the one that was released", github.ChecksumsAssetName, assetName)
+	}
 	return sum, nil
 }
 
