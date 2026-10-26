@@ -113,6 +113,34 @@ func TestAGHThatFailsPrintsNothingOrIsMissingGivesNoTokenSilently(t *testing.T) 
 	}
 }
 
+func TestATokenFromTheConfigFileWarnsThatItIsDeprecated(t *testing.T) {
+	env := clitest.New(t)
+	env.GitHub.AddReleases(fakegithub.Release{Tag: "3.8.0"})
+	configPath := env.WriteConfig("github:\n  token: " + fileToken + "\n")
+
+	res := env.Run("list-remote")
+
+	require.NoError(t, res.Err)
+	assert.Equal(t, "Warning: github.token in "+configPath+" is deprecated, and a later release will stop reading it. "+
+		"Set GH_TOKEN or run 'gh auth login' instead, and remove the token from that file.\n", res.Stderr)
+	assert.NotContains(t, res.Stdout, fileToken)
+	for _, header := range authorizations(t, env) {
+		assert.Equal(t, "Bearer "+fileToken, header)
+	}
+}
+
+func TestATokenInTheConfigFileThatAnotherSourceOverridesDoesNotWarn(t *testing.T) {
+	env := clitest.New(t)
+	env.GitHub.AddReleases(fakegithub.Release{Tag: "3.8.0"})
+	env.WriteConfig("github:\n  token: " + fileToken + "\n")
+	env.Setenv("GH_TOKEN", ghEnvToken)
+
+	res := env.Run("list-remote")
+
+	require.NoError(t, res.Err)
+	assert.Empty(t, res.Stderr)
+}
+
 func TestWithoutATokenRequestsAreUnauthenticated(t *testing.T) {
 	env := clitest.New(t)
 	env.GitHub.AddReleases(fakegithub.Release{Tag: "3.8.0"})

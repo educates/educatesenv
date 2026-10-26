@@ -4,6 +4,7 @@
 package token
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -89,7 +90,9 @@ func (t Token) String() string {
 //     the PATH
 //  5. fileToken, the github.token value of the config file at file
 //
-// A source whose token is empty has none.
+// A source whose token is empty has none. A token from the config file is
+// deprecated, so Resolve writes a warning that names the file to warnings
+// when it returns one.
 func Resolve(file, fileToken string, warnings io.Writer) Token {
 	for _, e := range environment {
 		if value := os.Getenv(e.variable); value != "" {
@@ -100,6 +103,7 @@ func Resolve(file, fileToken string, warnings io.Writer) Token {
 		return Token{value: value, source: ghAuthToken}
 	}
 	if fileToken != "" {
+		_, _ = fmt.Fprintf(warnings, "Warning: github.token in %s is deprecated, and a later release will stop reading it. Set GH_TOKEN or run 'gh auth login' instead, and remove the token from that file.\n", file)
 		return Token{value: fileToken, source: configFile}
 	}
 	return Token{}
