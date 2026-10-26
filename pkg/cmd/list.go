@@ -10,12 +10,21 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var listCmd = &cobra.Command{
-	Use:           "list",
-	Short:         "List installed educates versions",
-	SilenceErrors: true,
-	SilenceUsage:  true,
-	RunE: func(cmd *cobra.Command, args []string) error {
+func newListCommand(d *deps) *cobra.Command {
+	return &cobra.Command{
+		Use:           "list",
+		Short:         "List installed educates versions",
+		SilenceErrors: true,
+		SilenceUsage:  true,
+		RunE:          runList(d),
+	}
+}
+
+// runList returns the run function that list and list-local share.
+func runList(d *deps) func(cmd *cobra.Command, args []string) error {
+	return func(cmd *cobra.Command, args []string) error {
+		cfg := d.cfg
+
 		// Get all files in the bin directory
 		files, err := os.ReadDir(cfg.Local.Dir)
 		// If the bin directory doesn't exist call init
@@ -74,9 +83,5 @@ var listCmd = &cobra.Command{
 		}
 
 		return nil
-	},
-}
-
-func init() {
-	rootCmd.AddCommand(listCmd)
+	}
 }
