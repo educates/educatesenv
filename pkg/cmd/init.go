@@ -2,6 +2,9 @@ package cmd
 
 import (
 	"fmt"
+	"io"
+	"os"
+	"path/filepath"
 	"runtime"
 
 	"github.com/spf13/cobra"
@@ -40,16 +43,11 @@ func newInitCommand(d *deps) *cobra.Command {
 
 			// Print PATH instructions
 			_, _ = fmt.Fprintln(out, "\nTo use educatesenv, add the bin directory to your PATH:")
-			var pathCmd string
 			switch runtime.GOOS {
-			case platform.Darwin, platform.Linux:
-				pathCmd = fmt.Sprintf("echo 'export PATH=\"%s:$PATH\"' >> ~/.bashrc\nsource ~/.bashrc", defaultBin)
-				_, _ = fmt.Fprintf(out, "\nFor bash/zsh, run:\n  %s\n", pathCmd)
-				_, _ = fmt.Fprintf(out, "\nFor fish shell, run:\n  set -U fish_user_paths %s $fish_user_paths\n", defaultBin)
 			case platform.Windows:
 				_, _ = fmt.Fprintf(out, "\nFor Windows (PowerShell), run:\n  [Environment]::SetEnvironmentVariable(\"Path\", \"%s;\" + $Env:Path, [EnvironmentVariableTarget]::User)\n", defaultBin)
 			default:
-				_, _ = fmt.Fprintf(out, "\nAdd %s to your PATH manually.\n", defaultBin)
+				writeShellPathInstructions(out, os.Getenv("SHELL"), defaultBin)
 			}
 			_, _ = fmt.Fprintln(out, "\nRestart your terminal or source your profile to apply the changes.")
 
@@ -75,4 +73,20 @@ func newInitCommand(d *deps) *cobra.Command {
 	cmd.Flags().BoolVar(&downloadLatest, "download", false, "Download and set as active the latest stable version")
 	cmd.Flags().BoolVar(&overwrite, "overwrite", false, "Force download even if the version already exists")
 	return cmd
+}
+
+// writeShellPathInstructions writes how to add binDir to the PATH in the
+// shell at the path shell, as $SHELL gives it: zsh and bash get a line for
+// their rc file, fish gets fish_user_paths, and any other shell gets
+// generic instructions.
+func writeShellPathInstructions(out io.Writer, shell, binDir string) {
+	switch name := filepath.Base(shell); name {
+	case "zsh", "bash":
+		rcFile := "~/." + name + "rc"
+		_, _ = fmt.Fprintf(out, "\nFor %s, run:\n  echo 'export PATH=\"%s:$PATH\"' >> %s\n  source %s\n", name, binDir, rcFile, rcFile)
+	case "fish":
+		_, _ = fmt.Fprintf(out, "\nFor fish, run:\n  set -U fish_user_paths %s $fish_user_paths\n", binDir)
+	default:
+		_, _ = fmt.Fprintf(out, "\nAdd %s to your PATH in your shell's startup file.\n", binDir)
+	}
 }
