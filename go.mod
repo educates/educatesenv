@@ -1,6 +1,8 @@
 module github.com/educates/educatesenv
 
-go 1.24
+go 1.26.0
+
+toolchain go1.26.10
 
 require (
 	github.com/google/go-github/v71 v71.0.0
