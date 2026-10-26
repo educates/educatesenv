@@ -3,6 +3,8 @@ package github
 import (
 	"context"
 	"fmt"
+	"net/url"
+	"strings"
 
 	"github.com/educates/educatesenv/pkg/config"
 	"github.com/google/go-github/v71/github"
@@ -15,8 +17,28 @@ type Client struct {
 	config *config.Config
 }
 
-// New creates a new GitHub client with optional authentication
-func New(cfg *config.Config) *Client {
+// options holds the settings that Option values change.
+type options struct {
+	baseURL string
+}
+
+// Option changes how New builds a Client.
+type Option func(*options)
+
+// WithBaseURL sets the GitHub API base URL. The default is github.com's API.
+func WithBaseURL(baseURL string) Option {
+	return func(o *options) {
+		o.baseURL = baseURL
+	}
+}
+
+// New creates a new GitHub client, authenticated when the config holds a token
+func New(cfg *config.Config, opts ...Option) (*Client, error) {
+	var o options
+	for _, opt := range opts {
+		opt(&o)
+	}
+
 	ctx := context.Background()
 	var client *github.Client
 
@@ -27,10 +49,18 @@ func New(cfg *config.Config) *Client {
 		client = github.NewClient(nil)
 	}
 
+	if o.baseURL != "" {
+		base, err := url.Parse(strings.TrimSuffix(o.baseURL, "/") + "/")
+		if err != nil {
+			return nil, fmt.Errorf("invalid GitHub API base URL: %w", err)
+		}
+		client.BaseURL = base
+	}
+
 	return &Client{
 		client: client,
 		config: cfg,
-	}
+	}, nil
 }
 
 // GetLatestReleaseVersion returns the latest stable release version

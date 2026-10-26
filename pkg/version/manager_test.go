@@ -32,7 +32,8 @@ func setupTestManager(t *testing.T) (*Manager, string, func()) {
 	}
 
 	// Create GitHub client
-	gh := github.New(cfg)
+	gh, err := github.New(cfg)
+	assert.NoError(t, err)
 
 	// Create manager
 	manager := New(cfg, gh)
