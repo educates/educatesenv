@@ -10,6 +10,7 @@ import (
 )
 
 func TestNew(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
 	cfg := New()
 	assert.NotNil(t, cfg)
 	assert.Equal(t, DefaultGithubOrg, cfg.Github.Org)
@@ -27,6 +28,8 @@ func TestNew(t *testing.T) {
 }
 
 func TestLoad(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
 	// Setup temporary directory for test config
 	tmpDir, err := os.MkdirTemp("", "educatesenv-test")
 	assert.NoError(t, err)
@@ -73,6 +76,8 @@ development:
 }
 
 func TestLoadWithEnvVars(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
 	// Set environment variables
 	envVars := map[string]string{
 		"EDUCATES_GITHUB_ORG":                  "envorg",
