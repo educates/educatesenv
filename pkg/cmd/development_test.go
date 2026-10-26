@@ -99,6 +99,41 @@ func TestDisabledDevelopmentModeRemovesTheDevelopmentSymlink(t *testing.T) {
 	assert.FileExists(t, devBinary)
 }
 
+func TestASymlinkIntoASiblingOfTheBinDirectoryCountsAsADevelopmentSymlink(t *testing.T) {
+	env := clitest.New(t)
+	sibling := env.BinDir() + "2"
+	siblingBinary := filepath.Join(sibling, "educates-3.8.0")
+	require.NoError(t, os.MkdirAll(sibling, 0o755))
+	require.NoError(t, os.WriteFile(siblingBinary, []byte("educates 3.8.0"), 0o755))
+	require.NoError(t, os.MkdirAll(env.BinDir(), 0o755))
+	require.NoError(t, os.Symlink(filepath.Join("..", "bin2", "educates-3.8.0"), env.ActiveLink()))
+
+	res := env.Run("list")
+
+	require.NoError(t, res.Err)
+	assert.Equal(t,
+		"Warning: development mode is disabled; removed symlink to development binary. Please use 'educatesenv use <version>' to select a version\n"+
+			"Installed versions:\nNo versions installed\n",
+		res.Stdout)
+	assert.NoFileExists(t, env.ActiveLink())
+	assert.FileExists(t, siblingBinary)
+}
+
+func TestABinDirectoryWithATrailingSlashKeepsItsVersionSymlink(t *testing.T) {
+	env := clitest.New(t)
+	env.Setenv("EDUCATES_LOCAL_DIR", env.BinDir()+string(filepath.Separator))
+	env.WriteBinary("3.8.0")
+	require.NoError(t, os.Symlink("educates-3.8.0", env.ActiveLink()))
+
+	res := env.Run("list")
+
+	require.NoError(t, res.Err)
+	assert.Equal(t, "Installed versions:\n* 3.8.0 (active)\n", res.Stdout)
+	target, err := os.Readlink(env.ActiveLink())
+	require.NoError(t, err)
+	assert.Equal(t, "educates-3.8.0", target)
+}
+
 func TestEnabledDevelopmentModeKeepsTheDevelopmentSymlink(t *testing.T) {
 	env := clitest.New(t)
 	devBinary := writeDevelopmentBinary(t, env)
