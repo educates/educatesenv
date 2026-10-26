@@ -79,53 +79,54 @@ func (c *Config) Load() error {
 	configDir := filepath.Join(home, ConfigDirName)
 	defaultBin := filepath.Join(configDir, "bin")
 
-	viper.SetConfigName("config")
-	viper.SetConfigType("yaml")
-	viper.AddConfigPath(".")
-	viper.AddConfigPath(configDir)
+	v := viper.New()
+	v.SetConfigName("config")
+	v.SetConfigType("yaml")
+	v.AddConfigPath(".")
+	v.AddConfigPath(configDir)
 
 	// Set defaults
-	viper.SetDefault("github.org", DefaultGithubOrg)
-	viper.SetDefault("github.repository", DefaultGithubRepo)
-	viper.SetDefault("github.token", "")
-	viper.SetDefault("local.dir", defaultBin)
-	viper.SetDefault("development.enabled", false)
-	viper.SetDefault("development.binaryLocation", "")
+	v.SetDefault("github.org", DefaultGithubOrg)
+	v.SetDefault("github.repository", DefaultGithubRepo)
+	v.SetDefault("github.token", "")
+	v.SetDefault("local.dir", defaultBin)
+	v.SetDefault("development.enabled", false)
+	v.SetDefault("development.binaryLocation", "")
 
 	// Bind environment variables
-	if err := viper.BindEnv("github.org", "EDUCATES_GITHUB_ORG"); err != nil {
+	if err := v.BindEnv("github.org", "EDUCATES_GITHUB_ORG"); err != nil {
 		return fmt.Errorf("failed to bind env EDUCATES_GITHUB_ORG: %w", err)
 	}
-	if err := viper.BindEnv("github.repository", "EDUCATES_GITHUB_REPOSITORY"); err != nil {
+	if err := v.BindEnv("github.repository", "EDUCATES_GITHUB_REPOSITORY"); err != nil {
 		return fmt.Errorf("failed to bind env EDUCATES_GITHUB_REPOSITORY: %w", err)
 	}
-	if err := viper.BindEnv("github.token", "EDUCATES_GITHUB_TOKEN"); err != nil {
+	if err := v.BindEnv("github.token", "EDUCATES_GITHUB_TOKEN"); err != nil {
 		return fmt.Errorf("failed to bind env EDUCATES_GITHUB_TOKEN: %w", err)
 	}
-	if err := viper.BindEnv("local.dir", "EDUCATES_LOCAL_DIR"); err != nil {
+	if err := v.BindEnv("local.dir", "EDUCATES_LOCAL_DIR"); err != nil {
 		return fmt.Errorf("failed to bind env EDUCATES_LOCAL_DIR: %w", err)
 	}
-	if err := viper.BindEnv("development.enabled", "EDUCATES_DEVELOPMENT_ENABLED"); err != nil {
+	if err := v.BindEnv("development.enabled", "EDUCATES_DEVELOPMENT_ENABLED"); err != nil {
 		return fmt.Errorf("failed to bind env EDUCATES_DEVELOPMENT_ENABLED: %w", err)
 	}
-	if err := viper.BindEnv("development.binaryLocation", "EDUCATES_DEVELOPMENT_BINARY_LOCATION"); err != nil {
+	if err := v.BindEnv("development.binaryLocation", "EDUCATES_DEVELOPMENT_BINARY_LOCATION"); err != nil {
 		return fmt.Errorf("failed to bind env EDUCATES_DEVELOPMENT_BINARY_LOCATION: %w", err)
 	}
 
 	// Read config file if present
-	if err := viper.ReadInConfig(); err != nil {
+	if err := v.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
 			return fmt.Errorf("error reading config file: %w", err)
 		}
 	}
 
 	// Map the configuration to our struct
-	c.Github.Org = viper.GetString("github.org")
-	c.Github.Repository = viper.GetString("github.repository")
-	c.Github.Token = viper.GetString("github.token")
-	c.Local.Dir = viper.GetString("local.dir")
-	c.Development.Enabled = viper.GetBool("development.enabled")
-	c.Development.BinaryLocation = viper.GetString("development.binaryLocation")
+	c.Github.Org = v.GetString("github.org")
+	c.Github.Repository = v.GetString("github.repository")
+	c.Github.Token = v.GetString("github.token")
+	c.Local.Dir = v.GetString("local.dir")
+	c.Development.Enabled = v.GetBool("development.enabled")
+	c.Development.BinaryLocation = v.GetString("development.binaryLocation")
 
 	return nil
 }

@@ -1,6 +1,7 @@
 package cmd_test
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -19,6 +20,20 @@ func TestConfigViewPrintsTheConfiguration(t *testing.T) {
 	require.NoError(t, res.Err)
 	assert.Regexp(t, `^Current configuration:\ngithub:\n    org: acme\n`, res.Stdout)
 	assert.Empty(t, res.Stderr)
+}
+
+func TestEachRunReadsTheConfigAfresh(t *testing.T) {
+	env := clitest.New(t)
+	configPath := env.WriteConfig("github:\n  org: acme\n")
+	res := env.Run("config", "view")
+	require.NoError(t, res.Err)
+	require.Contains(t, res.Stdout, "org: acme\n")
+
+	require.NoError(t, os.Remove(configPath))
+	res = env.Run("config", "view")
+
+	require.NoError(t, res.Err)
+	assert.Contains(t, res.Stdout, "org: educates\n")
 }
 
 func TestConfigInitCreatesTheConfigFile(t *testing.T) {
