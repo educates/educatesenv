@@ -51,8 +51,10 @@ func newConfigViewCommand(d *deps) *cobra.Command {
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Convert config struct to YAML
-			yamlBytes, err := yaml.Marshal(d.cfg)
+			// The token is shown as its source, never as the token.
+			view := *d.cfg
+			view.Github.Token = d.githubToken().String()
+			yamlBytes, err := yaml.Marshal(view)
 			if err != nil {
 				return fmt.Errorf("failed to marshal config to YAML: %w", err)
 			}

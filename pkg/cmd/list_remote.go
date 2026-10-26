@@ -36,7 +36,11 @@ highest version first.`,
 				return fmt.Errorf("--recent must be at least 1, got %d", recent)
 			}
 
-			published, err := d.gh.ListReleases()
+			gh, err := d.githubClient()
+			if err != nil {
+				return err
+			}
+			published, err := gh.ListReleases()
 			if err != nil {
 				return err
 			}

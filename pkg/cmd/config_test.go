@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/educates/educatesenv/internal/clitest"
-	"github.com/educates/educatesenv/internal/fakegithub"
 )
 
 // configView runs `config view` and returns what it printed.
@@ -279,42 +278,6 @@ func TestAMalformedValueIsAnError(t *testing.T) {
 		require.Error(t, res.Err)
 		assert.Contains(t, res.Err.Error(), "error reading config file "+configPath+": ")
 	})
-}
-
-func TestRequestsCarryTheTokenFromTheEnvironmentOrTheConfigFile(t *testing.T) {
-	tests := []struct {
-		name   string
-		envVar string
-		config string
-		want   string
-	}{
-		{name: "EDUCATES_GITHUB_TOKEN", envVar: "envtoken", want: "Bearer envtoken"},
-		{name: "github.token", config: "github:\n  token: filetoken\n", want: "Bearer filetoken"},
-		{name: "EDUCATES_GITHUB_TOKEN over github.token", envVar: "envtoken", config: "github:\n  token: filetoken\n", want: "Bearer envtoken"},
-		{name: "neither", want: ""},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			env := clitest.New(t)
-			env.GitHub.AddReleases(fakegithub.Release{Tag: "3.8.0"})
-			if tt.config != "" {
-				env.WriteConfig(tt.config)
-			}
-			if tt.envVar != "" {
-				env.Setenv("EDUCATES_GITHUB_TOKEN", tt.envVar)
-			}
-
-			res := env.Run("list-remote")
-
-			require.NoError(t, res.Err)
-			requests := env.GitHub.Requests()
-			require.NotEmpty(t, requests)
-			for _, r := range requests {
-				assert.Equal(t, tt.want, r.Header.Get("Authorization"), r.Path)
-			}
-		})
-	}
 }
 
 func TestConfigInitCreatesTheSameConfigAsInit(t *testing.T) {

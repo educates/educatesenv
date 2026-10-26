@@ -8,6 +8,7 @@ import (
 
 	"github.com/educates/educatesenv/pkg/config"
 	"github.com/educates/educatesenv/pkg/github"
+	"github.com/educates/educatesenv/pkg/token"
 	"github.com/educates/educatesenv/pkg/version"
 )
 
@@ -31,13 +32,19 @@ func WithGitHubBaseURL(baseURL string) Option {
 type deps struct {
 	opts    options
 	cfg     *config.Config
-	gh      *github.Client
 	manager *version.Manager
+	errOut  io.Writer
+
+	// token is resolved on first use, by githubToken, and gh is created on
+	// first use, by githubClient.
+	token *token.Token
+	gh    *github.Client
 }
 
-// load reads the configuration and creates the GitHub client and the
-// version manager. Config warnings and the manager's progress go to out,
-// and the manager's warnings to errOut.
+// load reads the configuration and creates the version manager. Config
+// warnings and the manager's progress go to out, and the manager's
+// warnings and token warnings to errOut. It neither resolves the GitHub
+// token nor creates the GitHub client.
 func (d *deps) load(out, errOut io.Writer) error {
 	var err error
 	d.cfg, err = config.Load(out)
@@ -45,13 +52,32 @@ func (d *deps) load(out, errOut io.Writer) error {
 		return err
 	}
 
-	d.gh, err = github.New(d.cfg, github.WithBaseURL(d.opts.githubBaseURL))
-	if err != nil {
-		return err
-	}
-
-	d.manager = version.New(d.cfg, d.gh, out, errOut)
+	d.errOut = errOut
+	d.manager = version.New(d.cfg, d.githubClient, out, errOut)
 	return nil
+}
+
+// githubToken returns the GitHub token, resolving it on first use. Only
+// config view and the commands that call GitHub use it, so the others
+// never look the token up.
+func (d *deps) githubToken() token.Token {
+	if d.token == nil {
+		tok := token.Resolve(d.cfg.File(), d.cfg.Github.Token, d.errOut)
+		d.token = &tok
+	}
+	return *d.token
+}
+
+// githubClient returns the GitHub client, creating it on first use.
+func (d *deps) githubClient() (*github.Client, error) {
+	if d.gh == nil {
+		gh, err := github.New(d.cfg, github.WithBaseURL(d.opts.githubBaseURL), github.WithToken(d.githubToken()))
+		if err != nil {
+			return nil, err
+		}
+		d.gh = gh
+	}
+	return d.gh, nil
 }
 
 // cleanUpDevelopmentSymlink removes the educates symlink when it points
