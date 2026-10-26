@@ -114,6 +114,33 @@ func addTamperedRelease(env *clitest.Env, tag string) {
 	}})
 }
 
+func TestInstallVerifiesTheBinaryAgainstChecksumsTxt(t *testing.T) {
+	env := clitest.New(t)
+	env.GitHub.AddReleases(fakegithub.Release{Tag: "3.8.0", Assets: []fakegithub.Asset{
+		clitest.PlatformBinary([]byte("educates 3.8.0 binary")),
+		{Name: "checksums.txt", Content: []byte(
+			"5e990e9569bdb6a9a588600567e649ae1a63aa23b387ef9010b05dafada7657c  educates-plan9-mips\n" +
+				releasedSum + "  " + clitest.PlatformBinaryName() + "\n" +
+				"2d02d0c7095de4b2570439088c502b5a3fb02a8c9aee29844bd9878894db85c9  educates-installer-app.yaml\n")},
+	}})
+
+	res := env.Run("install", "3.8.0", "--use")
+
+	require.NoError(t, res.Err)
+	assert.Contains(t, res.Stdout, "Checksum verified against checksums.txt.\n")
+	assert.Contains(t, res.Stdout, "educates 3.8.0 installed successfully.\n")
+	assert.Contains(t, res.Stdout, "educates 3.8.0 is now active.\n")
+	assert.Empty(t, res.Stderr)
+	binary := filepath.Join(env.BinDir(), "educates-3.8.0")
+	content, err := os.ReadFile(binary)
+	require.NoError(t, err)
+	assert.Equal(t, "educates 3.8.0 binary", string(content))
+	info, err := os.Stat(binary)
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o755), info.Mode().Perm())
+	assert.ElementsMatch(t, []string{"educates", "educates-3.8.0"}, binDirEntries(t, env))
+}
+
 func TestInstallFailsOnAChecksumMismatchAndLeavesNothingBehind(t *testing.T) {
 	env := clitest.New(t)
 	addTamperedRelease(env, "3.8.0")

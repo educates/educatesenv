@@ -267,6 +267,7 @@ func (m *Manager) installBinary(assetName, url, releasedSum, binaryPath string) 
 		if sum := hex.EncodeToString(hash.Sum(nil)); sum != releasedSum {
 			return fmt.Errorf("checksum mismatch for %s: %s lists %s, but the download has %s", assetName, github.ChecksumsAssetName, releasedSum, sum)
 		}
+		_, _ = fmt.Fprintf(m.out, "Checksum verified against %s.\n", github.ChecksumsAssetName)
 	}
 
 	if err := tmp.Chmod(0o755); err != nil {
