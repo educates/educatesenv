@@ -42,6 +42,21 @@ func TestUseOfAVersionThatIsNotInstalledSaysHowToInstallIt(t *testing.T) {
 	assert.Equal(t, "educates-3.8.0", target)
 }
 
+func TestUseLatestSaysHowToInstallAndUseTheLatestRelease(t *testing.T) {
+	env := clitest.New(t)
+	env.WriteBinary("3.8.0")
+	require.NoError(t, os.Symlink("educates-3.8.0", env.ActiveLink()))
+
+	res := env.Run("use", "latest")
+
+	require.EqualError(t, res.Err, "use takes an installed version, not latest. Run 'educatesenv install latest --use' to install the latest stable release and switch to it")
+	assert.Empty(t, res.Stdout)
+	assert.Empty(t, env.GitHub.Requests())
+	target, err := os.Readlink(env.ActiveLink())
+	require.NoError(t, err)
+	assert.Equal(t, "educates-3.8.0", target)
+}
+
 func TestUseWithAnUnwritableBinDirectoryReportsTheCause(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("directory permissions do not apply to root")

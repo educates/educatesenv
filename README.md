@@ -227,7 +227,9 @@ educatesenv use 3.7.3
 `use` points the `educates` symlink at an installed version. When the
 version is not installed, it says so and how to install it; any other
 failure, such as a bin directory it cannot write to, is reported with its
-cause. `use develop` selects the development binary, as described under
+cause. `use` does not resolve `latest`: to install the latest stable
+release and switch to it, run `educatesenv install latest --use`.
+`use develop` selects the development binary, as described under
 [Development mode](#development-mode).
 
 ### Listing installed versions
