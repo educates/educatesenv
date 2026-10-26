@@ -35,8 +35,10 @@ type deps struct {
 	manager *version.Manager
 	errOut  io.Writer
 
-	// gh is created on first use, by githubClient.
-	gh *github.Client
+	// token is resolved on first use, by githubToken, and gh is created on
+	// first use, by githubClient.
+	token *token.Token
+	gh    *github.Client
 }
 
 // load reads the configuration and creates the version manager. Config
@@ -55,13 +57,21 @@ func (d *deps) load(out, errOut io.Writer) error {
 	return nil
 }
 
-// githubClient returns the GitHub client, resolving the token and creating
-// the client on first use. Only the commands that call GitHub use it, so
-// the others never look the token up.
+// githubToken returns the GitHub token, resolving it on first use. Only
+// config view and the commands that call GitHub use it, so the others
+// never look the token up.
+func (d *deps) githubToken() token.Token {
+	if d.token == nil {
+		tok := token.Resolve(d.cfg.File(), d.cfg.Github.Token, d.errOut)
+		d.token = &tok
+	}
+	return *d.token
+}
+
+// githubClient returns the GitHub client, creating it on first use.
 func (d *deps) githubClient() (*github.Client, error) {
 	if d.gh == nil {
-		tok := token.Resolve(d.cfg.File(), d.cfg.Github.Token, d.errOut)
-		gh, err := github.New(d.cfg, github.WithBaseURL(d.opts.githubBaseURL), github.WithToken(tok))
+		gh, err := github.New(d.cfg, github.WithBaseURL(d.opts.githubBaseURL), github.WithToken(d.githubToken()))
 		if err != nil {
 			return nil, err
 		}

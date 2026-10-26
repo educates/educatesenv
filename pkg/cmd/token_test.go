@@ -28,25 +28,27 @@ const (
 type tokenSource struct {
 	name  string
 	token string
+	// label is how config view shows a token from this source.
+	label string
 	set   func(env *clitest.Env)
 }
 
 // tokenSources are the sources of the GitHub token, in the order
 // educatesenv checks them.
 var tokenSources = []tokenSource{
-	{name: "EDUCATES_GITHUB_TOKEN", token: educatesEnvToken, set: func(env *clitest.Env) {
+	{name: "EDUCATES_GITHUB_TOKEN", token: educatesEnvToken, label: "<set via EDUCATES_GITHUB_TOKEN>", set: func(env *clitest.Env) {
 		env.Setenv("EDUCATES_GITHUB_TOKEN", educatesEnvToken)
 	}},
-	{name: "GH_TOKEN", token: ghEnvToken, set: func(env *clitest.Env) {
+	{name: "GH_TOKEN", token: ghEnvToken, label: "<set via GH_TOKEN>", set: func(env *clitest.Env) {
 		env.Setenv("GH_TOKEN", ghEnvToken)
 	}},
-	{name: "GITHUB_TOKEN", token: githubEnvToken, set: func(env *clitest.Env) {
+	{name: "GITHUB_TOKEN", token: githubEnvToken, label: "<set via GITHUB_TOKEN>", set: func(env *clitest.Env) {
 		env.Setenv("GITHUB_TOKEN", githubEnvToken)
 	}},
-	{name: "gh auth token", token: ghCLIToken, set: func(env *clitest.Env) {
+	{name: "gh auth token", token: ghCLIToken, label: "<set via gh auth token>", set: func(env *clitest.Env) {
 		fakeGHWithToken(env, ghCLIToken)
 	}},
-	{name: "config file", token: fileToken, set: func(env *clitest.Env) {
+	{name: "config file", token: fileToken, label: "<set in config file, deprecated>", set: func(env *clitest.Env) {
 		env.WriteConfig("github:\n  token: " + fileToken + "\n")
 	}},
 }
@@ -215,6 +217,36 @@ func TestCommandsThatCallGitHubRunGHOnce(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestConfigViewShowsWhereTheTokenComesFromAndNoneOfIt(t *testing.T) {
+	for i, winner := range tokenSources {
+		t.Run(winner.name, func(t *testing.T) {
+			env := clitest.New(t)
+			for _, source := range tokenSources[i:] {
+				source.set(env)
+			}
+
+			res := env.Run("config", "view")
+
+			require.NoError(t, res.Err)
+			assert.Contains(t, res.Stdout, "github:\n    org: educates\n    repository: educates-training-platform\n    token: "+winner.label+"\n")
+			for _, source := range tokenSources {
+				assert.NotContains(t, res.Stdout, source.token)
+				assert.NotContains(t, res.Stderr, source.token)
+			}
+		})
+	}
+
+	t.Run("not set", func(t *testing.T) {
+		env := clitest.New(t)
+
+		res := env.Run("config", "view")
+
+		require.NoError(t, res.Err)
+		assert.Contains(t, res.Stdout, "    repository: educates-training-platform\n    token: <not set>\n")
+		assert.Empty(t, res.Stderr)
+	})
 }
 
 func TestWithoutATokenRequestsAreUnauthenticated(t *testing.T) {
