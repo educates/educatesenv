@@ -13,7 +13,7 @@ import (
 
 func newUseCommand(d *deps) *cobra.Command {
 	return &cobra.Command{
-		Use:           "use [version|develop]",
+		Use:           "use <version|develop>",
 		Short:         "Switch to a specific educates version",
 		Args:          cobra.ExactArgs(1),
 		SilenceErrors: true,
@@ -56,7 +56,7 @@ func newUseCommand(d *deps) *cobra.Command {
 					return fmt.Errorf("use takes an installed version, not %[1]s. "+
 						"Run 'educatesenv install %[1]s --use' to install the latest stable release and switch to it", version.Latest)
 				case errors.Is(err, fs.ErrNotExist):
-					return fmt.Errorf("version %s is not installed. You should install it first with `educatesenv install %s`", name, name)
+					return fmt.Errorf("version %s is not installed. You should install it first with 'educatesenv install %s'", name, name)
 				}
 				return fmt.Errorf("failed to switch to version %s: %w", name, err)
 			}
