@@ -1,10 +1,25 @@
 package fakegithub
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync/atomic"
 )
+
+// Checksums returns a checksums.txt asset that lists the SHA-256 checksum
+// of each of assets, in the format sha256sum writes and Educates releases
+// publish.
+func Checksums(assets ...Asset) Asset {
+	var b strings.Builder
+	for _, a := range assets {
+		sum := sha256.Sum256(a.Content)
+		b.WriteString(hex.EncodeToString(sum[:]) + "  " + a.Name + "\n")
+	}
+	return Asset{Name: "checksums.txt", Content: []byte(b.String())}
+}
 
 // CutNextDownload makes the next download of the asset name of the release
 // tagged tag fail mid-transfer: the response announces the asset's full
