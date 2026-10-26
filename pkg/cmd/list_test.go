@@ -135,6 +135,19 @@ func TestListShowsDevelopFirstWhenDevelopmentModeIsEnabled(t *testing.T) {
 	}
 }
 
+func TestListMarksDevelopActiveAfterUseDevelop(t *testing.T) {
+	env := clitest.New(t)
+	devBinary := writeDevelopmentBinary(t, env)
+	env.WriteConfig("development:\n  enabled: true\n  binaryLocation: " + devBinary + "\n")
+	env.WriteBinary("3.8.0")
+	require.NoError(t, env.Run("use", "develop").Err)
+
+	res := env.Run("list")
+
+	require.NoError(t, res.Err)
+	assert.Equal(t, "Installed versions:\n* develop (active) -> "+devBinary+"\n  3.8.0\n", res.Stdout)
+}
+
 func TestListSaysWhenNoVersionIsInstalled(t *testing.T) {
 	env := clitest.New(t)
 

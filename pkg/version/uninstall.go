@@ -3,8 +3,10 @@ package version
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 
 	"github.com/educates/educatesenv/pkg/platform"
 )
@@ -22,8 +24,9 @@ func (m *Manager) UninstallVersions(versions []string, force bool) error {
 		return filepath.Join(binDir, platform.BinaryPrefix+version)
 	}
 
-	installed, err := fileNamesIn(binDir)
-	if err != nil {
+	// A missing bin directory holds no versions.
+	installed, active, err := m.Installed()
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return fmt.Errorf("failed to read bin directory %s: %w", binDir, err)
 	}
 
@@ -43,13 +46,14 @@ func (m *Manager) UninstallVersions(versions []string, force bool) error {
 			problems = append(problems, errors.New("cannot uninstall develop: educatesenv does not manage the development binary"))
 			continue
 		}
-		// Looking the binary up by name keeps an argument that holds a
-		// path from reaching outside the bin directory.
-		if !installed[platform.BinaryPrefix+version] {
+		// Looking the version up among the installed ones keeps an
+		// argument that holds a path from reaching outside the bin
+		// directory.
+		if !slices.Contains(installed, version) {
 			problems = append(problems, fmt.Errorf("version %s is not installed. Run 'educatesenv list' to see installed versions", version))
 			continue
 		}
-		if linksTo(activeLink, binaryPath(version)) {
+		if version == active {
 			if !force {
 				problems = append(problems, fmt.Errorf("version %s is active. Switch to another version with 'educatesenv use <version>' first, or pass --force to uninstall it", version))
 				continue
@@ -80,34 +84,4 @@ func (m *Manager) UninstallVersions(versions []string, force bool) error {
 		_, _ = fmt.Fprintln(m.out, "No educates version is active now. Run 'educatesenv use <version>' to select one.")
 	}
 	return nil
-}
-
-// fileNamesIn returns the names of the entries in dir that are not
-// directories. A missing dir holds none.
-func fileNamesIn(dir string) (map[string]bool, error) {
-	entries, err := os.ReadDir(dir)
-	if err != nil && !os.IsNotExist(err) {
-		return nil, err
-	}
-
-	names := make(map[string]bool, len(entries))
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			names[entry.Name()] = true
-		}
-	}
-	return names, nil
-}
-
-// linksTo reports whether link resolves to the same file as path.
-func linksTo(link, path string) bool {
-	linked, err := os.Stat(link)
-	if err != nil {
-		return false
-	}
-	target, err := os.Stat(path)
-	if err != nil {
-		return false
-	}
-	return os.SameFile(linked, target)
 }
