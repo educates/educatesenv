@@ -11,6 +11,7 @@ import (
 
 	"github.com/educates/educatesenv/pkg/config"
 	"github.com/educates/educatesenv/pkg/platform"
+	"github.com/educates/educatesenv/pkg/version"
 )
 
 func newInitCommand(d *deps) *cobra.Command {
@@ -54,13 +55,7 @@ func newInitCommand(d *deps) *cobra.Command {
 
 			if downloadLatest {
 				_, _ = fmt.Fprintln(out, "\nFetching latest educates version...")
-				latest, err := d.gh.GetLatestReleaseVersion()
-				if err != nil {
-					return fmt.Errorf("failed to get latest release version: %w", err)
-				}
-				_, _ = fmt.Fprintf(out, "Latest version: %s\n", latest)
-
-				if err := d.manager.InstallVersion(latest, overwrite, true); err != nil {
+				if err := d.manager.InstallVersion(version.Latest, overwrite, true); err != nil {
 					return err
 				}
 			} else {

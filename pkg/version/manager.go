@@ -149,8 +149,18 @@ func (m *Manager) GetPlatformBinaryName() (string, error) {
 	return platform.GetPlatformBinaryName(os, arch), nil
 }
 
-// InstallVersion installs a specific version of educates
+// InstallVersion installs a specific version of educates. Latest installs
+// the highest stable release, and says which version that is.
 func (m *Manager) InstallVersion(version string, force bool, activate bool) error {
+	if version == Latest {
+		resolved, err := m.ResolveLatest()
+		if err != nil {
+			return err
+		}
+		_, _ = fmt.Fprintf(m.out, "Resolved latest to %s\n", resolved)
+		version = resolved
+	}
+
 	binDir := m.config.Local.Dir
 	if err := os.MkdirAll(binDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create bin directory %s: %w", binDir, err)

@@ -16,8 +16,11 @@ func newInstallCommand(d *deps) *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:           "install <version>",
-		Short:         "Install a specific version of educates",
+		Use:   "install <version|latest>",
+		Short: "Install a specific version of educates, or the latest stable one",
+		Long: `Install a version of educates into the bin directory. The version
+latest installs the highest stable release by semver, and says which
+version that is.`,
 		Args:          cobra.ExactArgs(1),
 		SilenceErrors: true,
 		SilenceUsage:  true,
