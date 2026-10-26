@@ -39,12 +39,12 @@ type deps struct {
 // version manager. Config warnings and the manager's progress go to out,
 // and the manager's warnings to errOut.
 func (d *deps) load(out, errOut io.Writer) error {
-	d.cfg = config.New()
-	if err := d.cfg.Load(out); err != nil {
+	var err error
+	d.cfg, err = config.Load(out)
+	if err != nil {
 		return err
 	}
 
-	var err error
 	d.gh, err = github.New(d.cfg, github.WithBaseURL(d.opts.githubBaseURL))
 	if err != nil {
 		return err

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/educates/educatesenv/pkg/config"
+	"github.com/educates/educatesenv/pkg/releases"
 	"github.com/spf13/cobra"
 )
 
@@ -32,8 +33,7 @@ func runList(d *deps) func(cmd *cobra.Command, args []string) error {
 		files, err := os.ReadDir(cfg.Local.Dir)
 		// If the bin directory doesn't exist call init
 		if err != nil {
-			_, _, _, _, err := config.CreateConfigAndFolders()
-			if err != nil {
+			if _, _, err := config.CreateDefault(); err != nil {
 				return fmt.Errorf("you should run `educatesenv init` first")
 			}
 		}
@@ -64,24 +64,25 @@ func runList(d *deps) func(cmd *cobra.Command, args []string) error {
 			}
 		}
 
-		// Print regular versions
-		foundVersions := false
+		// Print regular versions, newest first
+		var versions []string
 		for _, file := range files {
 			if file.IsDir() || file.Name() == "educates" {
 				continue
 			}
-			if strings.HasPrefix(file.Name(), "educates-") {
-				version := strings.TrimPrefix(file.Name(), "educates-")
-				if version == activeVersion {
-					_, _ = fmt.Fprintf(out, "* %s (active)\n", version)
-				} else {
-					_, _ = fmt.Fprintf(out, "  %s\n", version)
-				}
-				foundVersions = true
+			if version, ok := strings.CutPrefix(file.Name(), "educates-"); ok {
+				versions = append(versions, version)
+			}
+		}
+		for _, version := range releases.SortInstalled(versions) {
+			if version == activeVersion {
+				_, _ = fmt.Fprintf(out, "* %s (active)\n", version)
+			} else {
+				_, _ = fmt.Fprintf(out, "  %s\n", version)
 			}
 		}
 
-		if !foundVersions && !cfg.Development.Enabled {
+		if len(versions) == 0 && !cfg.Development.Enabled {
 			_, _ = fmt.Fprintln(out, "No versions installed")
 		}
 
