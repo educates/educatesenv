@@ -62,7 +62,7 @@ func newConfigInitCommand() *cobra.Command {
 				return fmt.Errorf("failed to write config file: %w", err)
 			}
 
-			fmt.Fprintf(cmd.OutOrStdout(), "Config file created at %s\n", configPath)
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Config file created at %s\n", configPath)
 			return nil
 		},
 	}
@@ -84,8 +84,8 @@ func newConfigViewCommand(d *deps) *cobra.Command {
 
 			// Print the configuration
 			out := cmd.OutOrStdout()
-			fmt.Fprintln(out, "Current configuration:")
-			fmt.Fprintln(out, string(yamlBytes))
+			_, _ = fmt.Fprintln(out, "Current configuration:")
+			_, _ = fmt.Fprintln(out, string(yamlBytes))
 			return nil
 		},
 	}

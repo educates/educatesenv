@@ -15,8 +15,8 @@ func newVersionCommand() *cobra.Command {
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			_, err := fmt.Fprintln(cmd.OutOrStdout(), version.Version)
-			return err
+			_, _ = fmt.Fprintln(cmd.OutOrStdout(), version.Version)
+			return nil
 		},
 	}
 }

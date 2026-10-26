@@ -52,14 +52,14 @@ func runList(d *deps) func(cmd *cobra.Command, args []string) error {
 		}
 
 		// Print installed versions
-		fmt.Fprintln(out, "Installed versions:")
+		_, _ = fmt.Fprintln(out, "Installed versions:")
 
 		// Show development version if enabled
 		if cfg.Development.Enabled {
 			if isDevelopmentActive {
-				fmt.Fprintf(out, "* develop (active) -> %s\n", cfg.Development.BinaryLocation)
+				_, _ = fmt.Fprintf(out, "* develop (active) -> %s\n", cfg.Development.BinaryLocation)
 			} else {
-				fmt.Fprintf(out, "  develop -> %s\n", cfg.Development.BinaryLocation)
+				_, _ = fmt.Fprintf(out, "  develop -> %s\n", cfg.Development.BinaryLocation)
 			}
 		}
 
@@ -72,16 +72,16 @@ func runList(d *deps) func(cmd *cobra.Command, args []string) error {
 			if strings.HasPrefix(file.Name(), "educates-") {
 				version := strings.TrimPrefix(file.Name(), "educates-")
 				if version == activeVersion {
-					fmt.Fprintf(out, "* %s (active)\n", version)
+					_, _ = fmt.Fprintf(out, "* %s (active)\n", version)
 				} else {
-					fmt.Fprintf(out, "  %s\n", version)
+					_, _ = fmt.Fprintf(out, "  %s\n", version)
 				}
 				foundVersions = true
 			}
 		}
 
 		if !foundVersions && !cfg.Development.Enabled {
-			fmt.Fprintln(out, "No versions installed")
+			_, _ = fmt.Fprintln(out, "No versions installed")
 		}
 
 		return nil

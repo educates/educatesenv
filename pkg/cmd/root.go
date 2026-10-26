@@ -77,7 +77,7 @@ func NewRootCommand(opts ...Option) *cobra.Command {
 
 			// Validate development mode configuration
 			if err := d.manager.ValidateDevelopmentMode(); err != nil {
-				fmt.Fprintf(cmd.OutOrStdout(), "Warning: %v\n", err)
+				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Warning: %v\n", err)
 			}
 			return nil
 		},

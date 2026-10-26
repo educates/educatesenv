@@ -75,7 +75,7 @@ func New() *Config {
 func (c *Config) Load(out io.Writer) error {
 	home, err := os.UserHomeDir()
 	if err != nil {
-		fmt.Fprintln(out, "Warning: could not determine home directory, using current directory for bin folder.")
+		_, _ = fmt.Fprintln(out, "Warning: could not determine home directory, using current directory for bin folder.")
 		home = "."
 	}
 	configDir := filepath.Join(home, ConfigDirName)

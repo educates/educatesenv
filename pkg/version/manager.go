@@ -123,12 +123,12 @@ func (m *Manager) InstallVersion(version string, force bool, activate bool) erro
 
 	// Handle installation
 	if versionExists && !force {
-		fmt.Fprintf(m.out, "Version %s is already installed.\n", version)
+		_, _ = fmt.Fprintf(m.out, "Version %s is already installed.\n", version)
 	} else {
 		if versionExists {
-			fmt.Fprintf(m.out, "Reinstalling version %s...\n", version)
+			_, _ = fmt.Fprintf(m.out, "Reinstalling version %s...\n", version)
 		} else {
-			fmt.Fprintf(m.out, "Installing version %s...\n", version)
+			_, _ = fmt.Fprintf(m.out, "Installing version %s...\n", version)
 		}
 
 		assetName, err := m.GetPlatformBinaryName()
@@ -141,14 +141,14 @@ func (m *Manager) InstallVersion(version string, force bool, activate bool) erro
 			return err // Pass through the user-friendly error from GitHub client
 		}
 
-		fmt.Fprintf(m.out, "Downloading %s...\n", downloadURL)
+		_, _ = fmt.Fprintf(m.out, "Downloading %s...\n", downloadURL)
 		if err := m.downloadFile(downloadURL, binaryPath); err != nil {
 			return fmt.Errorf("failed to download binary (check your internet connection and try again): %w", err)
 		}
 		if err := os.Chmod(binaryPath, 0o755); err != nil {
 			return fmt.Errorf("failed to set executable permissions on %s: %w", binaryPath, err)
 		}
-		fmt.Fprintf(m.out, "educates %s installed successfully.\n", version)
+		_, _ = fmt.Fprintf(m.out, "educates %s installed successfully.\n", version)
 	}
 
 	// Handle activation if requested
@@ -156,7 +156,7 @@ func (m *Manager) InstallVersion(version string, force bool, activate bool) erro
 		if err := m.UseVersion(version); err != nil {
 			return fmt.Errorf("installation succeeded but failed to set version %s as active: %w", version, err)
 		}
-		fmt.Fprintf(m.out, "educates %s is now active.\n", version)
+		_, _ = fmt.Fprintf(m.out, "educates %s is now active.\n", version)
 	}
 
 	return nil

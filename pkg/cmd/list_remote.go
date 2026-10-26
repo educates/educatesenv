@@ -62,13 +62,13 @@ func newListRemoteCommand(d *deps) *cobra.Command {
 			}
 
 			// Print versions
-			fmt.Fprintln(out, "Available versions:")
+			_, _ = fmt.Fprintln(out, "Available versions:")
 			for _, version := range versions {
-				fmt.Fprintf(out, "- %s\n", version)
+				_, _ = fmt.Fprintf(out, "- %s\n", version)
 			}
 
 			if len(versions) == 0 {
-				fmt.Fprintln(out, "No versions found")
+				_, _ = fmt.Fprintln(out, "No versions found")
 			}
 
 			return nil

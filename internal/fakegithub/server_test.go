@@ -22,7 +22,8 @@ const (
 
 func newClient(t *testing.T, srv *fakegithub.Server, opts ...github.ClientOptionsFunc) *github.Client {
 	t.Helper()
-	client, err := github.NewClient(append([]github.ClientOptionsFunc{github.WithURLs(github.Ptr(srv.URL), nil)}, opts...)...)
+	baseURL := srv.URL
+	client, err := github.NewClient(append([]github.ClientOptionsFunc{github.WithURLs(&baseURL, nil)}, opts...)...)
 	require.NoError(t, err)
 	return client
 }
