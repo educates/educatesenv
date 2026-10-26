@@ -38,12 +38,12 @@ type deps struct {
 // load reads the configuration and creates the GitHub client and the
 // version manager. Warnings and the manager's progress go to out.
 func (d *deps) load(out io.Writer) error {
-	d.cfg = config.New()
-	if err := d.cfg.Load(out); err != nil {
+	var err error
+	d.cfg, err = config.Load(out)
+	if err != nil {
 		return err
 	}
 
-	var err error
 	d.gh, err = github.New(d.cfg, github.WithBaseURL(d.opts.githubBaseURL))
 	if err != nil {
 		return err

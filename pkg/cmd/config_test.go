@@ -67,6 +67,48 @@ func TestAMissingHomeDirectoryWarnsOnce(t *testing.T) {
 	assert.Equal(t, "Warning: could not determine home directory, using current directory for bin folder.\ndevelop\n", res.Stdout)
 }
 
+func TestAConfigFileInTheWorkingDirectoryIsIgnored(t *testing.T) {
+	const workDirConfig = "github:\n  org: elsewhere\ndevelopment:\n  enabled: true\n  binaryLocation: /tmp/educates\n"
+
+	t.Run("with a config in the home directory", func(t *testing.T) {
+		env := clitest.New(t)
+		env.WriteConfig("github:\n  org: acme\n")
+		require.NoError(t, os.WriteFile(filepath.Join(env.WorkDir, "config.yaml"), []byte(workDirConfig), 0o600))
+
+		out := configView(t, env)
+
+		assert.Contains(t, out, "    org: acme\n")
+		assert.Contains(t, out, "    enabled: false\n")
+		assert.NotContains(t, out, "/tmp/educates")
+	})
+
+	t.Run("without a config in the home directory", func(t *testing.T) {
+		env := clitest.New(t)
+		require.NoError(t, os.WriteFile(filepath.Join(env.WorkDir, "config.yaml"), []byte(workDirConfig), 0o600))
+
+		out := configView(t, env)
+
+		assert.Contains(t, out, "    org: educates\n")
+		assert.Contains(t, out, "    enabled: false\n")
+		assert.NotContains(t, out, "/tmp/educates")
+	})
+
+	t.Run("without a home directory", func(t *testing.T) {
+		env := clitest.New(t)
+		env.Unsetenv("HOME")
+		require.NoError(t, os.WriteFile(filepath.Join(env.WorkDir, "config.yaml"), []byte(workDirConfig), 0o600))
+		require.NoError(t, os.MkdirAll(filepath.Join(env.WorkDir, ".educatesenv"), 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(env.WorkDir, ".educatesenv", "config.yaml"), []byte(workDirConfig), 0o600))
+
+		out := configView(t, env)
+
+		assert.Contains(t, out, "    org: educates\n")
+		assert.Contains(t, out, "    dir: "+filepath.Join(".educatesenv", "bin")+"\n")
+		assert.Contains(t, out, "    enabled: false\n")
+		assert.NotContains(t, out, "/tmp/educates")
+	})
+}
+
 func TestConfigKeysMatchRegardlessOfCase(t *testing.T) {
 	env := clitest.New(t)
 	env.WriteConfig(`GitHub:
