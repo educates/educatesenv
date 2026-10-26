@@ -23,12 +23,12 @@ type Release struct {
 	Draft bool
 }
 
-// Order is the order Select returns releases in.
-type Order int
+// SortOrder is the order Select returns releases in.
+type SortOrder int
 
 const (
 	// BySemver orders releases by version, highest first.
-	BySemver Order = iota
+	BySemver SortOrder = iota
 	// ByPublishTime orders releases by publish time, newest first.
 	ByPublishTime
 )
@@ -36,21 +36,21 @@ const (
 // All is the Limit that chooses every candidate.
 const All = 0
 
-// Options are the choices Select makes.
-type Options struct {
+// SelectOptions are the choices Select makes.
+type SelectOptions struct {
 	// IncludePrereleases adds pre-releases to the candidates.
 	IncludePrereleases bool
 	// Limit is the most releases to choose. All, or any value below 1,
 	// chooses every candidate.
 	Limit int
 	// Order is the order of the chosen releases.
-	Order Order
+	Order SortOrder
 }
 
 // Select chooses releases from all. It returns the chosen releases, in
 // the order opts names, and the number of candidates they were chosen
 // from.
-func Select(all []Release, opts Options) (chosen []Release, candidates int) {
+func Select(all []Release, opts SelectOptions) (chosen []Release, candidates int) {
 	for _, r := range all {
 		if r.Draft || !isSemver(r.Tag) {
 			continue
