@@ -19,6 +19,18 @@ func configView(t *testing.T, env *clitest.Env) string {
 	return res.Stdout
 }
 
+func TestConfigWithoutASubcommandPrintsItsHelp(t *testing.T) {
+	env := clitest.New(t)
+
+	res := env.Run("config")
+
+	require.NoError(t, res.Err)
+	assert.Contains(t, res.Stdout, "Available Commands:\n")
+	assert.Contains(t, res.Stdout, "  init ")
+	assert.Contains(t, res.Stdout, "  view ")
+	assert.NoDirExists(t, env.ConfigDir())
+}
+
 func TestConfigViewPrintsTheConfiguration(t *testing.T) {
 	env := clitest.New(t)
 	env.WriteConfig("github:\n  org: acme\n")

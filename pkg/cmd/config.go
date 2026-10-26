@@ -13,8 +13,14 @@ func newConfigCommand(d *deps) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "config",
 		Short:         "Manage educatesenv configuration",
+		Args:          cobra.NoArgs,
 		SilenceErrors: true,
 		SilenceUsage:  true,
+		// cobra checks the arguments only of a command that can run, so
+		// config runs and prints its help.
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return cmd.Help()
+		},
 	}
 	cmd.AddCommand(newConfigInitCommand(), newConfigViewCommand(d))
 	return cmd
