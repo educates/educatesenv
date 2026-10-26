@@ -68,28 +68,6 @@ func New(cfg *config.Config, opts ...Option) (*Client, error) {
 	}, nil
 }
 
-// GetLatestReleaseVersion returns the latest stable release version
-func (c *Client) GetLatestReleaseVersion() (string, error) {
-	releases, resp, err := c.client.Repositories.ListReleases(context.Background(), c.config.Github.Org, c.config.Github.Repository, &github.ListOptions{PerPage: 10})
-	if err != nil {
-		if resp != nil && resp.StatusCode == 404 {
-			return "", fmt.Errorf("repository %s/%s not found", c.config.Github.Org, c.config.Github.Repository)
-		}
-		return "", fmt.Errorf("failed to fetch releases: %w", err)
-	}
-
-	if len(releases) == 0 {
-		return "", fmt.Errorf("no releases found in %s/%s", c.config.Github.Org, c.config.Github.Repository)
-	}
-
-	for _, rel := range releases {
-		if rel.GetTagName() != "" && !rel.GetPrerelease() {
-			return rel.GetTagName(), nil
-		}
-	}
-	return "", fmt.Errorf("no stable releases found in %s/%s. Try 'educatesenv list-remote --all' to see pre-releases", c.config.Github.Org, c.config.Github.Repository)
-}
-
 // ChecksumsAssetName is the name of the release asset that lists the
 // SHA-256 checksum of each of the release's other assets.
 const ChecksumsAssetName = "checksums.txt"
@@ -140,6 +118,9 @@ func (c *Client) ListReleases() ([]releases.Release, error) {
 	for {
 		page, resp, err := c.client.Repositories.ListReleases(context.Background(), c.config.Github.Org, c.config.Github.Repository, opts)
 		if err != nil {
+			if resp != nil && resp.StatusCode == 404 {
+				return nil, fmt.Errorf("repository %s/%s not found", c.config.Github.Org, c.config.Github.Repository)
+			}
 			return nil, fmt.Errorf("failed to fetch releases: %w", err)
 		}
 
