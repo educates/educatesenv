@@ -36,8 +36,9 @@ type deps struct {
 }
 
 // load reads the configuration and creates the GitHub client and the
-// version manager. Warnings and the manager's progress go to out.
-func (d *deps) load(out io.Writer) error {
+// version manager. Config warnings and the manager's progress go to out,
+// and the manager's warnings to errOut.
+func (d *deps) load(out, errOut io.Writer) error {
 	d.cfg = config.New()
 	if err := d.cfg.Load(out); err != nil {
 		return err
@@ -49,7 +50,7 @@ func (d *deps) load(out io.Writer) error {
 		return err
 	}
 
-	d.manager = version.New(d.cfg, d.gh, out)
+	d.manager = version.New(d.cfg, d.gh, out, errOut)
 	return nil
 }
 
@@ -66,7 +67,7 @@ func NewRootCommand(opts ...Option) *cobra.Command {
 		Short: "Manage multiple versions of the educates binary",
 		Long:  `A version manager for educates, inspired by tfenv.`,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			if err := d.load(cmd.OutOrStdout()); err != nil {
+			if err := d.load(cmd.OutOrStdout(), cmd.ErrOrStderr()); err != nil {
 				return err
 			}
 

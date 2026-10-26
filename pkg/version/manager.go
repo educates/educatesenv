@@ -22,14 +22,17 @@ type Manager struct {
 	config *config.Config
 	github *github.Client
 	out    io.Writer
+	errOut io.Writer
 }
 
-// New creates a new version manager that reports progress to out
-func New(cfg *config.Config, gh *github.Client, out io.Writer) *Manager {
+// New creates a new version manager that reports progress to out and
+// warnings to errOut
+func New(cfg *config.Config, gh *github.Client, out, errOut io.Writer) *Manager {
 	return &Manager{
 		config: cfg,
 		github: gh,
 		out:    out,
+		errOut: errOut,
 	}
 }
 
@@ -144,7 +147,7 @@ func (m *Manager) InstallVersion(version string, force bool, activate bool) erro
 			return err // Pass through the user-friendly error from GitHub client
 		}
 
-		releasedSum, err := m.releasedChecksum(assetName, assets.ChecksumsURL)
+		releasedSum, err := m.releasedChecksum(version, assetName, assets.ChecksumsURL)
 		if err != nil {
 			return err
 		}
@@ -201,11 +204,13 @@ func (m *Manager) createSymlink(source, target string) error {
 	return nil
 }
 
-// releasedChecksum returns the SHA-256 checksum that the release's
-// checksums.txt lists for assetName. It returns "" when the release has no
-// checksums.txt.
-func (m *Manager) releasedChecksum(assetName, checksumsURL string) (string, error) {
+// releasedChecksum returns the SHA-256 checksum that the checksums.txt of
+// the release of version lists for assetName. When the release has no
+// checksums.txt, it warns that the download cannot be verified and returns
+// "".
+func (m *Manager) releasedChecksum(version, assetName, checksumsURL string) (string, error) {
 	if checksumsURL == "" {
+		_, _ = fmt.Fprintf(m.errOut, "Warning: release %s has no %s, so %s is installed without verifying its checksum.\n", version, github.ChecksumsAssetName, assetName)
 		return "", nil
 	}
 

@@ -12,10 +12,13 @@ import (
 	"github.com/educates/educatesenv/internal/fakegithub"
 )
 
+// addRelease adds a release with the platform binary and a checksums.txt
+// that lists it, as every Educates release has.
 func addRelease(env *clitest.Env, tag string, binary []byte) {
+	asset := clitest.PlatformBinary(binary)
 	env.GitHub.AddReleases(fakegithub.Release{
 		Tag:    tag,
-		Assets: []fakegithub.Asset{clitest.PlatformBinary(binary)},
+		Assets: []fakegithub.Asset{asset, fakegithub.Checksums(asset)},
 	})
 }
 
@@ -155,4 +158,22 @@ func TestInstallFailsWhenChecksumsTxtHasNoEntryForTheBinary(t *testing.T) {
 	require.Error(t, res.Err)
 	assert.Contains(t, res.Err.Error(), "failed to install version 3.8.0: checksums.txt has no entry for "+clitest.PlatformBinaryName())
 	assert.Empty(t, binDirEntries(t, env))
+}
+
+func TestInstallWarnsAndContinuesWhenTheReleaseHasNoChecksumsTxt(t *testing.T) {
+	env := clitest.New(t)
+	env.GitHub.AddReleases(fakegithub.Release{Tag: "3.8.0", Assets: []fakegithub.Asset{
+		clitest.PlatformBinary([]byte("educates 3.8.0 binary")),
+	}})
+
+	res := env.Run("install", "3.8.0")
+
+	require.NoError(t, res.Err)
+	assert.Contains(t, res.Stderr, "Warning: release 3.8.0 has no checksums.txt")
+	assert.NotContains(t, res.Stdout, "Warning")
+	assert.Contains(t, res.Stdout, "educates 3.8.0 installed successfully.\n")
+	content, err := os.ReadFile(filepath.Join(env.BinDir(), "educates-3.8.0"))
+	require.NoError(t, err)
+	assert.Equal(t, "educates 3.8.0 binary", string(content))
+	assert.Equal(t, []string{"educates-3.8.0"}, binDirEntries(t, env))
 }
