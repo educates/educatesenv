@@ -87,6 +87,7 @@ func NewRootCommand(opts ...Option) *cobra.Command {
 		newListCommand(d),
 		newListLocalCommand(d),
 		newListRemoteCommand(d),
+		newUninstallCommand(d),
 		newUseCommand(d),
 		newVersionCommand(),
 	)
