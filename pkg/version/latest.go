@@ -13,7 +13,11 @@ const Latest = "latest"
 // ResolveLatest returns the tag of the highest stable release by semver,
 // among every release of the repository.
 func (m *Manager) ResolveLatest() (string, error) {
-	published, err := m.github.ListReleases()
+	gh, err := m.github()
+	if err != nil {
+		return "", err
+	}
+	published, err := gh.ListReleases()
 	if err != nil {
 		return "", err
 	}

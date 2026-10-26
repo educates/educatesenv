@@ -1,6 +1,11 @@
 package cmd_test
 
 import (
+	"errors"
+	"io/fs"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -139,6 +144,77 @@ func TestATokenInTheConfigFileThatAnotherSourceOverridesDoesNotWarn(t *testing.T
 
 	require.NoError(t, res.Err)
 	assert.Empty(t, res.Stderr)
+}
+
+// recordingFakeGH puts a gh on the PATH that records the arguments of each
+// call, and prints ghCLIToken for `gh auth token --hostname github.com`.
+// It returns a function that returns the recorded calls.
+func recordingFakeGH(t *testing.T, env *clitest.Env) func() []string {
+	t.Helper()
+	calls := filepath.Join(env.Home, "gh-calls")
+	env.FakeGH(`printf '%s\n' "$*" >> '` + calls + `'
+if [ "$*" = "auth token --hostname github.com" ]; then printf '%s\n' '` + ghCLIToken + `'; exit 0; fi
+exit 1`)
+	return func() []string {
+		content, err := os.ReadFile(calls)
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil
+		}
+		require.NoError(t, err)
+		return strings.Split(strings.TrimSuffix(string(content), "\n"), "\n")
+	}
+}
+
+func TestCommandsThatDoNotCallGitHubNeverRunGH(t *testing.T) {
+	commands := [][]string{
+		{"list"},
+		{"use", "3.8.0"},
+		{"version"},
+		{"uninstall", "3.7.0"},
+		{"init"},
+		{"config", "init"},
+	}
+
+	for _, command := range commands {
+		t.Run(strings.Join(command, " "), func(t *testing.T) {
+			env := clitest.New(t)
+			env.WriteBinary("3.8.0")
+			env.WriteBinary("3.7.0")
+			ghCalls := recordingFakeGH(t, env)
+
+			res := env.Run(command...)
+
+			require.NoError(t, res.Err)
+			assert.Empty(t, ghCalls())
+		})
+	}
+}
+
+func TestCommandsThatCallGitHubRunGHOnce(t *testing.T) {
+	commands := [][]string{
+		{"list-remote"},
+		{"install", "3.8.0"},
+		{"install", "latest"},
+		{"init", "--download"},
+	}
+
+	for _, command := range commands {
+		t.Run(strings.Join(command, " "), func(t *testing.T) {
+			env := clitest.New(t)
+			addRelease(env, "3.8.0", []byte("educates 3.8.0 binary"))
+			ghCalls := recordingFakeGH(t, env)
+
+			res := env.Run(command...)
+
+			require.NoError(t, res.Err)
+			assert.Equal(t, []string{"auth token --hostname github.com"}, ghCalls())
+			for _, r := range env.GitHub.Requests() {
+				if strings.HasPrefix(r.Path, "/repos/") {
+					assert.Equal(t, "Bearer "+ghCLIToken, r.Header.Get("Authorization"), r.Path)
+				}
+			}
+		})
+	}
 }
 
 func TestWithoutATokenRequestsAreUnauthenticated(t *testing.T) {

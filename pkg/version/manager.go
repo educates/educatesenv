@@ -33,15 +33,16 @@ const (
 // Manager handles version-related operations
 type Manager struct {
 	config *config.Config
-	github *github.Client
+	github func() (*github.Client, error)
 	http   *http.Client
 	out    io.Writer
 	errOut io.Writer
 }
 
 // New creates a new version manager that reports progress to out and
-// warnings to errOut
-func New(cfg *config.Config, gh *github.Client, out, errOut io.Writer) *Manager {
+// warnings to errOut. gh returns the GitHub client, and the manager calls
+// it only when an operation needs GitHub.
+func New(cfg *config.Config, gh func() (*github.Client, error), out, errOut io.Writer) *Manager {
 	return &Manager{
 		config: cfg,
 		github: gh,
@@ -186,7 +187,11 @@ func (m *Manager) InstallVersion(version string, force bool, activate bool) erro
 			return fmt.Errorf("failed to determine platform binary name: %w", err)
 		}
 
-		assets, err := m.github.GetReleaseAssets(version, assetName)
+		gh, err := m.github()
+		if err != nil {
+			return err
+		}
+		assets, err := gh.GetReleaseAssets(version, assetName)
 		if err != nil {
 			return err // Pass through the user-friendly error from GitHub client
 		}
