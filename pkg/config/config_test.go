@@ -1,6 +1,7 @@
 package config
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -61,7 +62,7 @@ development:
 
 	// Test loading config from file
 	cfg := New()
-	err = cfg.Load()
+	err = cfg.Load(io.Discard)
 	assert.NoError(t, err)
 	assert.Equal(t, "testorg", cfg.Github.Org)
 	assert.Equal(t, "testrepo", cfg.Github.Repository)
@@ -94,7 +95,7 @@ func TestLoadWithEnvVars(t *testing.T) {
 
 	// Test loading config with environment variables
 	cfg := New()
-	err := cfg.Load()
+	err := cfg.Load(io.Discard)
 	assert.NoError(t, err)
 	assert.Equal(t, "envorg", cfg.Github.Org)
 	assert.Equal(t, "envrepo", cfg.Github.Repository)

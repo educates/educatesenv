@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -43,11 +44,11 @@ type Config struct {
 	Development DevelopmentConfig `yaml:"development"`
 }
 
-// New returns a new Config instance with defaults set
+// New returns a new Config instance with defaults set. Without a home
+// directory, the bin folder is under the current directory.
 func New() *Config {
 	home, err := os.UserHomeDir()
 	if err != nil {
-		fmt.Println("Warning: could not determine home directory, using current directory for bin folder.")
 		home = "."
 	}
 	configDir := filepath.Join(home, ConfigDirName)
@@ -69,11 +70,12 @@ func New() *Config {
 	}
 }
 
-// Load initializes the configuration from file and environment variables
-func (c *Config) Load() error {
+// Load initializes the configuration from file and environment variables.
+// It writes a warning to out when there is no home directory.
+func (c *Config) Load(out io.Writer) error {
 	home, err := os.UserHomeDir()
 	if err != nil {
-		fmt.Println("Warning: could not determine home directory, using current directory for bin folder.")
+		fmt.Fprintln(out, "Warning: could not determine home directory, using current directory for bin folder.")
 		home = "."
 	}
 	configDir := filepath.Join(home, ConfigDirName)

@@ -36,6 +36,16 @@ func TestEachRunReadsTheConfigAfresh(t *testing.T) {
 	assert.Contains(t, res.Stdout, "org: educates\n")
 }
 
+func TestAMissingHomeDirectoryWarnsOnce(t *testing.T) {
+	env := clitest.New(t)
+	env.Unsetenv("HOME")
+
+	res := env.Run("version")
+
+	require.NoError(t, res.Err)
+	assert.Equal(t, "Warning: could not determine home directory, using current directory for bin folder.\ndevelop\n", res.Stdout)
+}
+
 func TestConfigInitCreatesTheConfigFile(t *testing.T) {
 	env := clitest.New(t)
 	configPath := filepath.Join(env.ConfigDir(), "config.yaml")
