@@ -478,14 +478,15 @@ repository secrets:
 | `MACOS_NOTARY_KEY_ID` | the ID of the `.p8` key |
 | `MACOS_NOTARY_ISSUER_ID` | the issuer UUID of the `.p8` key |
 
-A release from a tag push always signs the macOS binaries. The run fails
-before anything is published when `MACOS_SIGN_P12` is empty or missing,
-when signing fails, or when the notarization submission fails. When any
-of the three `MACOS_NOTARY_*` secrets is empty, GoReleaser signs the
-binaries without submitting them for notarization. Only the manual
-trigger's `skip-signing` input, described below, releases unsigned. A
-snapshot build, such as `goreleaser release --snapshot --clean`, signs
-only when `MACOS_SIGN_P12` is set, so it builds without the certificate.
+Every release signs and notarizes the macOS binaries, except a manual run
+with the `skip-signing` input described below. Its first step checks the
+five secrets and fails, naming the ones that are empty or missing. The
+run also fails when signing fails or when the notarization submission
+fails. GoReleaser signs and notarizes before it creates the draft
+release, so a failed run leaves the tag but no release behind, and a
+manual run with `skip-signing` can release that tag. A snapshot build,
+such as `goreleaser release --snapshot --clean`, signs only when
+`MACOS_SIGN_P12` is set, so it builds without the certificate.
 
 ### Publishing the draft
 

@@ -27,6 +27,29 @@ jobs:
       # id-token: write
     
     steps:
+    # Every release signs and notarizes the macOS binaries unless a manual run
+    # sets skip-signing. Without this check, an empty notary secret would make
+    # GoReleaser sign the binaries, skip notarization and still succeed.
+    - name: Check the macOS signing and notarization secrets
+      if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.skip-signing) }}
+      env:
+        MACOS_SIGN_P12: ${{ secrets.MACOS_SIGN_P12 }}
+        MACOS_SIGN_PASSWORD: ${{ secrets.MACOS_SIGN_PASSWORD }}
+        MACOS_NOTARY_KEY: ${{ secrets.MACOS_NOTARY_KEY }}
+        MACOS_NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
+        MACOS_NOTARY_ISSUER_ID: ${{ secrets.MACOS_NOTARY_ISSUER_ID }}
+      run: |
+        missing=""
+        for name in MACOS_SIGN_P12 MACOS_SIGN_PASSWORD MACOS_NOTARY_KEY MACOS_NOTARY_KEY_ID MACOS_NOTARY_ISSUER_ID; do
+          if [ -z "${!name}" ]; then
+            missing="$missing $name"
+          fi
+        done
+        if [ -n "$missing" ]; then
+          echo "::error::These secrets are empty or missing:$missing. Set them, or run the workflow manually with skip-signing to release unsigned."
+          exit 1
+        fi
+
     - name: Checkout code
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
