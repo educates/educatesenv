@@ -48,6 +48,12 @@ release:
   # We wait so that we don't make the release public until we have notarize email from Apple.
   draft: true
 
+  # Delete a draft release with the same name, the tag, before creating the
+  # release. A run that fails while uploading leaves a draft behind, and
+  # GitHub's lookup by tag never finds drafts, so without this a rerun would
+  # leave two drafts for the same tag.
+  replace_existing_draft: true
+
   # What to do with the release notes in case there the release already exists.
   #
   # Valid options are:

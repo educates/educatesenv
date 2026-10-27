@@ -484,7 +484,9 @@ five secrets and fails, naming the ones that are empty or missing. The
 run also fails when signing fails or when the notarization submission
 fails. GoReleaser signs and notarizes before it creates the draft
 release, so a failed run leaves the tag but no release behind, and a
-manual run with `skip-signing` can release that tag. A snapshot build,
+manual run with `skip-signing` can release that tag. A run that fails
+later, while uploading, leaves a draft, which the next run for the same
+tag deletes and creates again. A snapshot build,
 such as `goreleaser release --snapshot --clean`, signs only when
 `MACOS_SIGN_P12` is set, so it builds without the certificate.
 
