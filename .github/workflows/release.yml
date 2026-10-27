@@ -20,6 +20,11 @@ jobs:
   release:
     name: Create Release
     runs-on: ubuntu-latest
+    env:
+      # false for a manual run with skip-signing, true otherwise. The secrets
+      # check below and .goreleaser.yml both read it to decide whether to sign
+      # and notarize the macOS binaries.
+      MACOS_SIGNING: ${{ (github.event_name == 'workflow_dispatch' && inputs.skip-signing) && 'false' || 'true' }}
     permissions:
       contents: write
       # packages: write
@@ -27,11 +32,11 @@ jobs:
       # id-token: write
     
     steps:
-    # Every release signs and notarizes the macOS binaries unless a manual run
-    # sets skip-signing. Without this check, an empty notary secret would make
+    # Every release signs and notarizes the macOS binaries unless MACOS_SIGNING
+    # is false. Without this check, an empty notary secret would make
     # GoReleaser sign the binaries, skip notarization and still succeed.
     - name: Check the macOS signing and notarization secrets
-      if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.skip-signing) }}
+      if: env.MACOS_SIGNING != 'false'
       env:
         MACOS_SIGN_P12: ${{ secrets.MACOS_SIGN_P12 }}
         MACOS_SIGN_PASSWORD: ${{ secrets.MACOS_SIGN_PASSWORD }}
@@ -68,10 +73,9 @@ jobs:
       uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
       with:
         version: v2.19.0
-        # Only a manual run can skip signing. Every other release signs, and
-        # .goreleaser.yml makes it fail when MACOS_SIGN_P12 is empty or
-        # signing fails.
-        args: release --clean${{ github.event_name == 'workflow_dispatch' && inputs.skip-signing && ' --skip=notarize' || '' }}
+        # .goreleaser.yml signs and notarizes unless MACOS_SIGNING, set for the
+        # job above, is false.
+        args: release --clean
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         # The base64 of the contents of your '.p12' key.

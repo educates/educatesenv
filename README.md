@@ -494,7 +494,8 @@ release signs unless `MACOS_SIGNING` is `false`, and a snapshot signs
 only when it is `true`. So `goreleaser release --snapshot --clean` builds
 without the certificate, and
 `MACOS_SIGNING=true goreleaser release --snapshot --clean` tests signing
-with it.
+with it. The release workflow sets it to `false` for a manual run with
+`skip-signing`, and to `true` for every other run.
 
 ### Publishing the draft
 
@@ -514,8 +515,9 @@ ticked, or with the GitHub CLI:
 gh workflow run release.yml -f release_tag=v1.1.0 -f skip-signing=true
 ```
 
-GoReleaser then runs with `--skip=notarize`, and every platform ships,
-the macOS binaries unsigned. No secret needs to change. There is no
+The workflow then sets `MACOS_SIGNING=false` and skips the secrets
+check, and every platform ships, the macOS binaries unsigned. No secret
+or variable needs to change. There is no
 notarization email to wait for, so publish the draft once its notes are
 ready, and point macOS users who download in a browser to the quarantine
 note under [Installation](#macos-and-the-quarantine-attribute). Only the
