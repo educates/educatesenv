@@ -103,6 +103,46 @@ func TestInstallCutMidTransferLeavesNothingBehindAndARetryInstalls(t *testing.T)
 	assert.Equal(t, []string{"educates-3.8.0"}, binDirEntries(t, env))
 }
 
+func TestInstallFailsWhenTheDownloadStallsAndLeavesNothingBehindAndARetryInstalls(t *testing.T) {
+	env := clitest.New(t)
+	env.DownloadIdleTimeout = 100 * time.Millisecond
+	addRelease(env, "3.8.0", []byte("educates 3.8.0 binary"))
+	env.GitHub.StallNextDownload("3.8.0", clitest.PlatformBinaryName())
+
+	res := env.Run("install", "3.8.0")
+
+	require.EqualError(t, res.Err, "failed to install version 3.8.0: failed to download binary (check your internet connection and try again): download stalled: no data arrived for 0.1 seconds")
+	assert.NotContains(t, res.Stdout, "installed successfully")
+	assert.Empty(t, binDirEntries(t, env))
+
+	res = env.Run("install", "3.8.0")
+
+	require.NoError(t, res.Err)
+	assert.Contains(t, res.Stdout, "educates 3.8.0 installed successfully.\n")
+	content, err := os.ReadFile(filepath.Join(env.BinDir(), "educates-3.8.0"))
+	require.NoError(t, err)
+	assert.Equal(t, "educates 3.8.0 binary", string(content))
+	assert.Equal(t, []string{"educates-3.8.0"}, binDirEntries(t, env))
+}
+
+func TestInstallFinishesASlowDownloadThatKeepsMakingProgress(t *testing.T) {
+	env := clitest.New(t)
+	env.DownloadIdleTimeout = 250 * time.Millisecond
+	addRelease(env, "3.8.0", []byte("educates 3.8.0 binary"))
+	// The binary arrives in 8 chunks 50 milliseconds apart: no wait comes
+	// near the idle timeout, but the transfer takes longer than it in all.
+	env.GitHub.TrickleDownloads("3.8.0", clitest.PlatformBinaryName(), 8, 50*time.Millisecond)
+
+	res := env.Run("install", "3.8.0")
+
+	require.NoError(t, res.Err)
+	assert.Contains(t, res.Stdout, "educates 3.8.0 installed successfully.\n")
+	content, err := os.ReadFile(filepath.Join(env.BinDir(), "educates-3.8.0"))
+	require.NoError(t, err)
+	assert.Equal(t, "educates 3.8.0 binary", string(content))
+	assert.Equal(t, []string{"educates-3.8.0"}, binDirEntries(t, env))
+}
+
 // releasedSum is the SHA-256 checksum of "educates 3.8.0 binary".
 const releasedSum = "21163080cb987ff30bc789604b421676c7065e47b4c77415af76459db9bfc4bd"
 

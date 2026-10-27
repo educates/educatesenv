@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"sync/atomic"
+	"time"
 )
 
 // Checksums returns a checksums.txt asset that lists the SHA-256 checksum
@@ -27,9 +28,73 @@ func Checksums(assets ...Asset) Asset {
 // connection. Later downloads of the asset are served whole. Calling it
 // twice for the same asset panics, as Handle does.
 func (s *Server) CutNextDownload(tag, name string) {
-	var cut atomic.Bool
+	s.interruptNextDownload(tag, name, func(w http.ResponseWriter, _ *http.Request) {
+		conn, _, err := http.NewResponseController(w).Hijack()
+		if err != nil {
+			panic("fakegithub: cannot drop the connection: " + err.Error())
+		}
+		_ = conn.Close()
+	})
+}
+
+// stallLimit is how long a stalled download sends nothing before the
+// server drops the connection, so that a client that never gives up fails
+// instead of hanging the test.
+const stallLimit = 10 * time.Second
+
+// StallNextDownload makes the next download of the asset name of the
+// release tagged tag stall mid-transfer: the response announces the
+// asset's full length and sends the first half of it, then sends nothing
+// more and keeps the connection open until the client gives up. After 10
+// seconds the server drops the connection. Later downloads of the asset
+// are served whole. Calling it twice for the same asset panics, as Handle
+// does.
+func (s *Server) StallNextDownload(tag, name string) {
+	s.interruptNextDownload(tag, name, func(_ http.ResponseWriter, r *http.Request) {
+		select {
+		case <-r.Context().Done():
+		case <-time.After(stallLimit):
+		}
+	})
+}
+
+// TrickleDownloads makes every download of the asset name of the release
+// tagged tag arrive slowly: the response announces the asset's full length
+// and sends it in chunks pieces of about the same size, waiting interval
+// before each one, so the transfer takes chunks times interval in all.
+// Calling it twice for the same asset panics, as Handle does.
+func (s *Server) TrickleDownloads(tag, name string, chunks int, interval time.Duration) {
 	s.Handle("GET /download/"+tag+"/"+name, func(w http.ResponseWriter, r *http.Request) {
-		if cut.Swap(true) {
+		content, ok := s.assetContent(tag, name)
+		if !ok {
+			notFound(w)
+			return
+		}
+		w.Header().Set("Content-Type", "application/octet-stream")
+		w.Header().Set("Content-Length", strconv.Itoa(len(content)))
+		w.WriteHeader(http.StatusOK)
+		rc := http.NewResponseController(w)
+		_ = rc.Flush()
+		for i := range chunks {
+			select {
+			case <-r.Context().Done():
+				return
+			case <-time.After(interval):
+			}
+			_, _ = w.Write(content[i*len(content)/chunks : (i+1)*len(content)/chunks])
+			_ = rc.Flush()
+		}
+	})
+}
+
+// interruptNextDownload makes the next download of the asset name of the
+// release tagged tag announce the asset's full length and send the first
+// half of it, then calls interrupt to end the transfer. Later downloads of
+// the asset are served whole.
+func (s *Server) interruptNextDownload(tag, name string, interrupt http.HandlerFunc) {
+	var interrupted atomic.Bool
+	s.Handle("GET /download/"+tag+"/"+name, func(w http.ResponseWriter, r *http.Request) {
+		if interrupted.Swap(true) {
 			s.routes.ServeHTTP(w, r)
 			return
 		}
@@ -43,13 +108,8 @@ func (s *Server) CutNextDownload(tag, name string) {
 		w.Header().Set("Content-Length", strconv.Itoa(len(content)))
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write(content[:len(content)/2])
-		rc := http.NewResponseController(w)
-		_ = rc.Flush()
-		conn, _, err := rc.Hijack()
-		if err != nil {
-			panic("fakegithub: cannot drop the connection: " + err.Error())
-		}
-		_ = conn.Close()
+		_ = http.NewResponseController(w).Flush()
+		interrupt(w, r)
 	})
 }
 

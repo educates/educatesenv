@@ -2,8 +2,10 @@ package version
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -12,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -20,36 +23,57 @@ import (
 	"github.com/educates/educatesenv/pkg/platform"
 )
 
-// Timeouts of the HTTP client that downloads release assets. Each one bounds
-// a step that waits on the server before any of the body arrives. Nothing
-// bounds the whole transfer, so a slow download that keeps making progress
+// Timeouts of the downloads of release assets. The first three each bound a
+// step that waits on the server before any of the body arrives, and
+// downloadIdleTimeout bounds each wait for more of the body. Nothing bounds
+// the whole transfer, so a slow download that keeps making progress
 // finishes.
 const (
 	connectTimeout        = 30 * time.Second
 	tlsHandshakeTimeout   = 10 * time.Second
 	responseHeaderTimeout = 30 * time.Second
+	downloadIdleTimeout   = 60 * time.Second
 )
 
 // Manager handles version-related operations
 type Manager struct {
-	config *config.Config
-	github func() (*github.Client, error)
-	http   *http.Client
-	out    io.Writer
-	errOut io.Writer
+	config              *config.Config
+	github              func() (*github.Client, error)
+	http                *http.Client
+	downloadIdleTimeout time.Duration
+	out                 io.Writer
+	errOut              io.Writer
+}
+
+// Option changes how New builds a Manager.
+type Option func(*Manager)
+
+// WithDownloadIdleTimeout makes a download fail when no data arrives for
+// timeout. The default is 60 seconds, and a zero timeout keeps it.
+func WithDownloadIdleTimeout(timeout time.Duration) Option {
+	return func(m *Manager) {
+		if timeout > 0 {
+			m.downloadIdleTimeout = timeout
+		}
+	}
 }
 
 // New creates a new version manager that reports progress to out and
 // warnings to errOut. gh returns the GitHub client, and the manager calls
 // it only when an operation needs GitHub.
-func New(cfg *config.Config, gh func() (*github.Client, error), out, errOut io.Writer) *Manager {
-	return &Manager{
-		config: cfg,
-		github: gh,
-		http:   newDownloadClient(),
-		out:    out,
-		errOut: errOut,
+func New(cfg *config.Config, gh func() (*github.Client, error), out, errOut io.Writer, opts ...Option) *Manager {
+	m := &Manager{
+		config:              cfg,
+		github:              gh,
+		http:                newDownloadClient(),
+		downloadIdleTimeout: downloadIdleTimeout,
+		out:                 out,
+		errOut:              errOut,
 	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
 }
 
 // Develop is the version name that stands for the development binary.
@@ -351,9 +375,17 @@ func (m *Manager) installBinary(assetName, url, releasedSum, binaryPath string) 
 	return nil
 }
 
-// download writes the body of a GET of url to w.
+// download writes the body of a GET of url to w. It fails when the body
+// stalls: when a read waits longer than the download idle timeout for data.
 func (m *Manager) download(url string, w io.Writer) error {
-	resp, err := m.http.Get(url)
+	ctx, cancel := context.WithCancelCause(context.Background())
+	defer cancel(nil)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return err
+	}
+	resp, err := m.http.Do(req)
 	if err != nil {
 		return err
 	}
@@ -363,6 +395,28 @@ func (m *Manager) download(url string, w io.Writer) error {
 		return fmt.Errorf("GET %s: %s", url, resp.Status)
 	}
 
-	_, err = io.Copy(w, resp.Body)
+	seconds := strconv.FormatFloat(m.downloadIdleTimeout.Seconds(), 'f', -1, 64)
+	stalled := fmt.Errorf("download stalled: no data arrived for %s seconds", seconds)
+	timer := time.AfterFunc(m.downloadIdleTimeout, func() { cancel(stalled) })
+	defer timer.Stop()
+
+	_, err = io.Copy(w, &idleTimeoutReader{r: resp.Body, timeout: m.downloadIdleTimeout, timer: timer})
+	if err != nil && errors.Is(context.Cause(ctx), stalled) {
+		return stalled
+	}
 	return err
+}
+
+// idleTimeoutReader reads from r, and runs timer's function when a read
+// waits longer than timeout for data.
+type idleTimeoutReader struct {
+	r       io.Reader
+	timeout time.Duration
+	timer   *time.Timer
+}
+
+func (r *idleTimeoutReader) Read(p []byte) (int, error) {
+	r.timer.Reset(r.timeout)
+	defer r.timer.Stop()
+	return r.r.Read(p)
 }

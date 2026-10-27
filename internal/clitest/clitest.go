@@ -18,6 +18,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/educates/educatesenv/internal/fakegithub"
 	"github.com/educates/educatesenv/pkg/cmd"
@@ -53,6 +54,10 @@ type Env struct {
 	PathDir string
 	// GitHub is the fake GitHub server the commands call.
 	GitHub *fakegithub.Server
+	// DownloadIdleTimeout, when not zero, is how long a download in the
+	// commands Run builds waits for data before it fails, in place of the
+	// 60 seconds it waits outside tests.
+	DownloadIdleTimeout time.Duration
 }
 
 // Result is what one run of a command tree produced.
@@ -96,7 +101,10 @@ func New(t *testing.T) *Env {
 func (e *Env) Run(args ...string) Result {
 	e.t.Helper()
 
-	root := cmd.NewRootCommand(cmd.WithGitHubBaseURL(e.GitHub.URL))
+	root := cmd.NewRootCommand(
+		cmd.WithGitHubBaseURL(e.GitHub.URL),
+		cmd.WithDownloadIdleTimeout(e.DownloadIdleTimeout),
+	)
 	var stdout, stderr bytes.Buffer
 	root.SetOut(&stdout)
 	root.SetErr(&stderr)

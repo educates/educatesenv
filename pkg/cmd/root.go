@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -16,7 +17,8 @@ import (
 type Option func(*options)
 
 type options struct {
-	githubBaseURL string
+	githubBaseURL       string
+	downloadIdleTimeout time.Duration
 }
 
 // WithGitHubBaseURL points the GitHub client at baseURL instead of
@@ -24,6 +26,15 @@ type options struct {
 func WithGitHubBaseURL(baseURL string) Option {
 	return func(o *options) {
 		o.githubBaseURL = baseURL
+	}
+}
+
+// WithDownloadIdleTimeout makes a download fail when no data arrives for
+// timeout, instead of the 60 seconds the version manager waits by default.
+// A zero timeout keeps the default.
+func WithDownloadIdleTimeout(timeout time.Duration) Option {
+	return func(o *options) {
+		o.downloadIdleTimeout = timeout
 	}
 }
 
@@ -54,7 +65,7 @@ func (d *deps) load(out, errOut io.Writer) error {
 	}
 
 	d.errOut = errOut
-	d.manager = version.New(d.cfg, d.githubClient, out, errOut)
+	d.manager = version.New(d.cfg, d.githubClient, out, errOut, version.WithDownloadIdleTimeout(d.opts.downloadIdleTimeout))
 	return nil
 }
 
