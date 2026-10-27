@@ -31,6 +31,9 @@ jobs:
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         ref: ${{ github.event.inputs.release_tag != '' && github.event.inputs.release_tag || github.ref_type == 'tag' && github.ref_name || github.sha }}
+        # GoReleaser's changelog needs the full history to find the previous
+        # tag.
+        fetch-depth: 0
 
     - name: Set up Go
       uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
