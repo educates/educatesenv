@@ -214,8 +214,9 @@ renamed into place only once it is complete and verified. A failed or
 interrupted download leaves nothing behind, and a version that was
 already installed stays as it was. A download times out when the server
 takes more than 30 seconds to accept the connection, 10 seconds to
-complete the TLS handshake or 30 seconds to start its response. Nothing
-caps the transfer itself, so a slow download that keeps making progress
+complete the TLS handshake or 30 seconds to start its response, and it
+fails as stalled when no data arrives for 60 seconds. Nothing caps the
+transfer as a whole, so a slow download that keeps making progress
 finishes.
 
 ### Switching versions
