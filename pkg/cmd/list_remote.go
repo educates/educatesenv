@@ -2,77 +2,89 @@ package cmd
 
 import (
 	"fmt"
-	"sort"
-	"strings"
+	"text/tabwriter"
+	"time"
 
 	"github.com/spf13/cobra"
+
+	"github.com/educates/educatesenv/pkg/releases"
 )
 
-var (
-	showAll     bool
-	showRecents bool
-)
+func newListRemoteCommand(d *deps) *cobra.Command {
+	var (
+		recent      int
+		all         bool
+		preReleases bool
+		byDate      bool
+		recents     bool
+	)
 
-// isPreRelease checks if a version string contains pre-release indicators
-func isPreRelease(version string) bool {
-	preReleaseIndicators := []string{
-		"-alpha", "-beta", "-rc",
-		".alpha.", ".beta.", ".rc.",
-	}
-	version = strings.ToLower(version)
-	for _, indicator := range preReleaseIndicators {
-		if strings.Contains(version, indicator) {
-			return true
-		}
-	}
-	return false
-}
-
-var listRemoteCmd = &cobra.Command{
-	Use:           "list-remote",
-	Short:         "List all available versions from GitHub releases",
-	SilenceErrors: true,
-	SilenceUsage:  true,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		releases, err := gh.ListReleases()
-		if err != nil {
-			return fmt.Errorf("failed to fetch releases: %w", err)
-		}
-
-		// Filter and collect versions
-		var versions []string
-		for _, rel := range releases {
-			version := rel.GetTagName()
-			if !showAll && (rel.GetPrerelease() || isPreRelease(version)) {
-				continue
+	cmd := &cobra.Command{
+		Use:   "list-remote",
+		Short: "List the newest versions available from GitHub releases",
+		Long: `List the versions available from GitHub releases, with the date each
+was published. By default it shows the 10 newest stable releases,
+highest version first.`,
+		Args:          cobra.NoArgs,
+		SilenceErrors: true,
+		SilenceUsage:  true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if recents {
+				_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "Flag --recents has been deprecated, the 10 most recent releases are now shown by default")
 			}
-			versions = append(versions, version)
-		}
+			if recent < 1 {
+				return fmt.Errorf("--recent must be at least 1, got %d", recent)
+			}
 
-		// Sort versions in reverse order (newest first)
-		sort.Sort(sort.Reverse(sort.StringSlice(versions)))
+			gh, err := d.githubClient()
+			if err != nil {
+				return err
+			}
+			published, err := gh.ListReleases()
+			if err != nil {
+				return err
+			}
 
-		// Limit to recent versions if requested
-		if showRecents && len(versions) > 10 {
-			versions = versions[:10]
-		}
+			opts := releases.SelectOptions{IncludePrereleases: preReleases, Limit: recent}
+			if all {
+				opts.Limit = releases.All
+			}
+			if byDate {
+				opts.Order = releases.ByPublishTime
+			}
+			chosen, candidates := releases.Select(published, opts)
+			if len(chosen) == 0 {
+				_, _ = fmt.Fprintln(cmd.OutOrStdout(), "No versions found")
+				return nil
+			}
 
-		// Print versions
-		fmt.Println("Available versions:")
-		for _, version := range versions {
-			fmt.Printf("- %s\n", version)
-		}
+			table := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 0, 2, ' ', 0)
+			_, _ = fmt.Fprintln(table, "VERSION\tRELEASED")
+			for _, r := range chosen {
+				_, _ = fmt.Fprintf(table, "%s\t%s\n", r.Tag, r.PublishedAt.UTC().Format(time.DateOnly))
+			}
+			_ = table.Flush()
 
-		if len(versions) == 0 {
-			fmt.Println("No versions found")
-		}
+			if len(chosen) < candidates {
+				if preReleases {
+					_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Showing %d of %d releases. Use --all to see all.\n", len(chosen), candidates)
+				} else {
+					_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Showing %d of %d stable releases. Use --all to see all, --pre-releases to include pre-releases.\n", len(chosen), candidates)
+				}
+			}
+			return nil
+		},
+	}
 
-		return nil
-	},
-}
-
-func init() {
-	listRemoteCmd.Flags().BoolVar(&showAll, "all", false, "Show all versions including pre-releases")
-	listRemoteCmd.Flags().BoolVar(&showRecents, "recents", false, "Show only the 10 most recent versions")
-	rootCmd.AddCommand(listRemoteCmd)
+	cmd.Flags().IntVarP(&recent, "recent", "n", 10, "Show the N newest releases")
+	cmd.Flags().BoolVar(&all, "all", false, "Show every release instead of the newest")
+	cmd.Flags().BoolVar(&preReleases, "pre-releases", false, "Include pre-releases")
+	cmd.Flags().BoolVar(&byDate, "by-date", false, "Order by publish date instead of by version")
+	// --recents is deprecated. pflag's MarkDeprecated would print its
+	// warning through cobra's output writer, which is stdout once SetOut is
+	// called, so the flag is hidden and RunE prints the warning to stderr.
+	cmd.Flags().BoolVar(&recents, "recents", false, "Show only the 10 most recent versions")
+	_ = cmd.Flags().MarkHidden("recents")
+	cmd.MarkFlagsMutuallyExclusive("all", "recent")
+	return cmd
 }

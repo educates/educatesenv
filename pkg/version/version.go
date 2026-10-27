@@ -9,30 +9,30 @@ var (
 	// -ldflags="-X 'github.com/educates/educatesenv/pkg/version.Version=$TAG'"
 	defaultVersion = "develop"
 	Version        = ""
-	moduleName     = "github.com/educates/educatesenv"
 )
 
 func init() {
-	Version = version()
+	info, ok := debug.ReadBuildInfo()
+	Version = buildVersion(Version, info, ok)
 }
 
-func version() string {
-	if Version != "" {
-		// Version was set via ldflags, just return it.
-		return Version
+// buildVersion returns the version a binary reports. A version set through
+// ldflags wins. Otherwise it is the main module's version from the build
+// info, which `go install module@version` records, and "develop" when the
+// build info has none or records "(devel)".
+func buildVersion(ldflagsVersion string, info *debug.BuildInfo, ok bool) string {
+	if ldflagsVersion != "" {
+		return ldflagsVersion
 	}
 
-	info, ok := debug.ReadBuildInfo()
-	if !ok {
+	if !ok || info == nil {
 		return defaultVersion
 	}
 
-	// Anything else.
-	for _, dep := range info.Deps {
-		if dep.Path == moduleName {
-			return dep.Version
-		}
+	switch info.Main.Version {
+	case "", "(devel)":
+		return defaultVersion
+	default:
+		return info.Main.Version
 	}
-
-	return defaultVersion
 }

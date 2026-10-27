@@ -10,11 +10,22 @@ on:
         description: 'Tag or version to build (e.g., v1.2.3). If not set, uses latest commit.'
         required: false
         default: ''
+      skip-signing:
+        description: 'Release without signing and notarizing the macOS binaries, for when the Apple membership or certificate is unavailable.'
+        type: boolean
+        required: false
+        default: false
 
 jobs:
   release:
     name: Create Release
     runs-on: ubuntu-latest
+    env:
+      # false for a manual run with skip-signing, or for any run while the
+      # MACOS_SIGNING repository variable is false; true otherwise. The secrets
+      # check below and .goreleaser.yml both read it to decide whether to sign
+      # and notarize the macOS binaries.
+      MACOS_SIGNING: ${{ ((github.event_name == 'workflow_dispatch' && inputs.skip-signing) || vars.MACOS_SIGNING == 'false') && 'false' || 'true' }}
     permissions:
       contents: write
       # packages: write
@@ -22,22 +33,53 @@ jobs:
       # id-token: write
     
     steps:
+    # Every release signs and notarizes the macOS binaries unless MACOS_SIGNING
+    # is false. Without this check, an empty notary secret would make
+    # GoReleaser sign the binaries, skip notarization and still succeed.
+    - name: Report a release without macOS signing
+      if: env.MACOS_SIGNING == 'false'
+      run: echo "::warning::This release does not sign or notarize the macOS binaries, because the skip-signing input is set or the MACOS_SIGNING repository variable is false."
+
+    - name: Check the macOS signing and notarization secrets
+      if: env.MACOS_SIGNING != 'false'
+      env:
+        MACOS_SIGN_P12: ${{ secrets.MACOS_SIGN_P12 }}
+        MACOS_SIGN_PASSWORD: ${{ secrets.MACOS_SIGN_PASSWORD }}
+        MACOS_NOTARY_KEY: ${{ secrets.MACOS_NOTARY_KEY }}
+        MACOS_NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
+        MACOS_NOTARY_ISSUER_ID: ${{ secrets.MACOS_NOTARY_ISSUER_ID }}
+      run: |
+        missing=""
+        for name in MACOS_SIGN_P12 MACOS_SIGN_PASSWORD MACOS_NOTARY_KEY MACOS_NOTARY_KEY_ID MACOS_NOTARY_ISSUER_ID; do
+          if [ -z "${!name}" ]; then
+            missing="$missing $name"
+          fi
+        done
+        if [ -n "$missing" ]; then
+          echo "::error::These secrets are empty or missing:$missing. Set them, or run the workflow manually with skip-signing to release unsigned."
+          exit 1
+        fi
+
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         ref: ${{ github.event.inputs.release_tag != '' && github.event.inputs.release_tag || github.ref_type == 'tag' && github.ref_name || github.sha }}
+        # GoReleaser's changelog needs the full history to find the previous
+        # tag.
+        fetch-depth: 0
 
     - name: Set up Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
       with:
-        go-version: '1.24'
+        go-version-file: go.mod
         cache: true
 
     - name: Run GoReleaser
-      uses: goreleaser/goreleaser-action@v6
+      uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
       with:
-        # 'latest', 'nightly', or a semver
-        version: "~> v2"
+        version: v2.19.0
+        # .goreleaser.yml signs and notarizes unless MACOS_SIGNING, set for the
+        # job above, is false.
         args: release --clean
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,30 +1,110 @@
 package version
 
 import (
+	"bytes"
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/educates/educatesenv/pkg/config"
 	"github.com/educates/educatesenv/pkg/github"
 	"github.com/educates/educatesenv/pkg/platform"
 )
 
+// Timeouts of the downloads of release assets. The first three each bound a
+// step that waits on the server before any of the body arrives, and
+// downloadIdleTimeout bounds each wait for more of the body. Nothing bounds
+// the whole transfer, so a slow download that keeps making progress
+// finishes.
+const (
+	connectTimeout        = 30 * time.Second
+	tlsHandshakeTimeout   = 10 * time.Second
+	responseHeaderTimeout = 30 * time.Second
+	downloadIdleTimeout   = 60 * time.Second
+)
+
 // Manager handles version-related operations
 type Manager struct {
-	config *config.Config
-	github *github.Client
+	config              *config.Config
+	github              func() (*github.Client, error)
+	http                *http.Client
+	downloadIdleTimeout time.Duration
+	out                 io.Writer
+	errOut              io.Writer
 }
 
-// New creates a new version manager
-func New(cfg *config.Config, gh *github.Client) *Manager {
-	return &Manager{
-		config: cfg,
-		github: gh,
+// Option changes how New builds a Manager.
+type Option func(*Manager)
+
+// WithDownloadIdleTimeout makes a download fail when no data arrives for
+// timeout. The default is 60 seconds, and a zero timeout keeps it.
+func WithDownloadIdleTimeout(timeout time.Duration) Option {
+	return func(m *Manager) {
+		if timeout > 0 {
+			m.downloadIdleTimeout = timeout
+		}
+	}
+}
+
+// New creates a new version manager that reports progress to out and
+// warnings to errOut. gh returns the GitHub client, and the manager calls
+// it only when an operation needs GitHub.
+func New(cfg *config.Config, gh func() (*github.Client, error), out, errOut io.Writer, opts ...Option) *Manager {
+	m := &Manager{
+		config:              cfg,
+		github:              gh,
+		http:                newDownloadClient(),
+		downloadIdleTimeout: downloadIdleTimeout,
+		out:                 out,
+		errOut:              errOut,
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// Develop is the version name that stands for the development binary.
+const Develop = "develop"
+
+// activeLinkName is the name of the symlink in the bin directory that
+// points at the active version's binary, which then runs as educates.
+const activeLinkName = "educates"
+
+// activeLink returns the path of the educates symlink.
+func (m *Manager) activeLink() string {
+	return filepath.Join(m.config.Local.Dir, activeLinkName)
+}
+
+// binaryPath returns the path of the binary of the installed version.
+func (m *Manager) binaryPath(version string) string {
+	return filepath.Join(m.config.Local.Dir, platform.BinaryPrefix+version)
+}
+
+// newDownloadClient returns the HTTP client that downloads release assets.
+// It times out on connecting, on the TLS handshake and on waiting for the
+// response headers, and sets no limit on the whole transfer.
+func newDownloadClient() *http.Client {
+	return &http.Client{
+		Transport: &http.Transport{
+			Proxy:                 http.ProxyFromEnvironment,
+			DialContext:           (&net.Dialer{Timeout: connectTimeout}).DialContext,
+			TLSHandshakeTimeout:   tlsHandshakeTimeout,
+			ResponseHeaderTimeout: responseHeaderTimeout,
+			ForceAttemptHTTP2:     true,
+		},
 	}
 }
 
@@ -34,7 +114,7 @@ func (m *Manager) ValidateDevelopmentMode() error {
 		return nil
 	}
 
-	symlinkPath := filepath.Join(m.config.Local.Dir, "educates")
+	symlinkPath := m.activeLink()
 	isDev, err := m.isDevSymlink(symlinkPath)
 	if err != nil {
 		return fmt.Errorf("failed to validate development mode: %w", err)
@@ -65,18 +145,22 @@ func (m *Manager) isDevSymlink(symlinkPath string) (bool, error) {
 		target = filepath.Join(filepath.Dir(symlinkPath), target)
 	}
 
-	// A symlink is considered a development symlink if:
-	// 1. Development mode is disabled AND
-	// 2. The target is outside the managed bin directory OR doesn't have the expected binary prefix
-	return !strings.HasPrefix(target, m.config.Local.Dir) || !strings.HasPrefix(filepath.Base(target), platform.BinaryPrefix), nil
+	// A symlink is a development symlink when its target is not directly
+	// in the managed bin directory, or lacks the binary prefix. The
+	// directories are compared as cleaned paths, so a sibling directory
+	// whose name starts with the bin directory's counts as outside.
+	// filepath.Dir returns a cleaned path.
+	inBinDir := filepath.Dir(target) == filepath.Clean(m.config.Local.Dir)
+	return !inBinDir || !strings.HasPrefix(filepath.Base(target), platform.BinaryPrefix), nil
 }
 
-// UseVersion sets a version as active
+// UseVersion sets a version as active. When the version's binary is
+// missing, the error wraps fs.ErrNotExist.
 func (m *Manager) UseVersion(version string) error {
-	symlinkPath := filepath.Join(m.config.Local.Dir, "educates")
+	symlinkPath := m.activeLink()
 
 	// Handle development version
-	if version == "develop" {
+	if version == Develop {
 		if !m.config.Development.Enabled {
 			return fmt.Errorf("development mode is not enabled. Enable it in the config file by setting development.enabled to true")
 		}
@@ -87,7 +171,7 @@ func (m *Manager) UseVersion(version string) error {
 	}
 
 	// Handle regular version
-	binaryPath := filepath.Join(m.config.Local.Dir, fmt.Sprintf("%s%s", platform.BinaryPrefix, version))
+	binaryPath := m.binaryPath(version)
 	err := m.createSymlink(binaryPath, symlinkPath)
 	if err != nil {
 		return fmt.Errorf("%w", err)
@@ -107,26 +191,36 @@ func (m *Manager) GetPlatformBinaryName() (string, error) {
 	return platform.GetPlatformBinaryName(os, arch), nil
 }
 
-// InstallVersion installs a specific version of educates
+// InstallVersion installs a specific version of educates. Latest installs
+// the highest stable release, and says which version that is.
 func (m *Manager) InstallVersion(version string, force bool, activate bool) error {
+	if version == Latest {
+		resolved, err := m.ResolveLatest()
+		if err != nil {
+			return err
+		}
+		_, _ = fmt.Fprintf(m.out, "Resolved latest to %s\n", resolved)
+		version = resolved
+	}
+
 	binDir := m.config.Local.Dir
 	if err := os.MkdirAll(binDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create bin directory %s: %w", binDir, err)
 	}
 
 	// Check if version already exists
-	binaryPath := filepath.Join(binDir, fmt.Sprintf("%s%s", platform.BinaryPrefix, version))
+	binaryPath := m.binaryPath(version)
 	_, err := os.Stat(binaryPath)
 	versionExists := err == nil
 
 	// Handle installation
 	if versionExists && !force {
-		fmt.Printf("Version %s is already installed.\n", version)
+		_, _ = fmt.Fprintf(m.out, "Version %s is already installed.\n", version)
 	} else {
 		if versionExists {
-			fmt.Printf("Reinstalling version %s...\n", version)
+			_, _ = fmt.Fprintf(m.out, "Reinstalling version %s...\n", version)
 		} else {
-			fmt.Printf("Installing version %s...\n", version)
+			_, _ = fmt.Fprintf(m.out, "Installing version %s...\n", version)
 		}
 
 		assetName, err := m.GetPlatformBinaryName()
@@ -134,19 +228,24 @@ func (m *Manager) InstallVersion(version string, force bool, activate bool) erro
 			return fmt.Errorf("failed to determine platform binary name: %w", err)
 		}
 
-		downloadURL, err := m.github.GetReleaseAssetURL(version, assetName)
+		gh, err := m.github()
+		if err != nil {
+			return err
+		}
+		assets, err := gh.GetReleaseAssets(version, assetName)
 		if err != nil {
 			return err // Pass through the user-friendly error from GitHub client
 		}
 
-		fmt.Printf("Downloading %s...\n", downloadURL)
-		if err := m.downloadFile(downloadURL, binaryPath); err != nil {
-			return fmt.Errorf("failed to download binary (check your internet connection and try again): %w", err)
+		releasedSum, err := m.releasedChecksum(version, assetName, assets.ChecksumsURL)
+		if err != nil {
+			return err
 		}
-		if err := os.Chmod(binaryPath, 0o755); err != nil {
-			return fmt.Errorf("failed to set executable permissions on %s: %w", binaryPath, err)
+
+		if err := m.installBinary(assetName, assets.BinaryURL, releasedSum, binaryPath); err != nil {
+			return err
 		}
-		fmt.Printf("educates %s installed successfully.\n", version)
+		_, _ = fmt.Fprintf(m.out, "educates %s installed successfully.\n", version)
 	}
 
 	// Handle activation if requested
@@ -154,7 +253,7 @@ func (m *Manager) InstallVersion(version string, force bool, activate bool) erro
 		if err := m.UseVersion(version); err != nil {
 			return fmt.Errorf("installation succeeded but failed to set version %s as active: %w", version, err)
 		}
-		fmt.Printf("educates %s is now active.\n", version)
+		_, _ = fmt.Fprintf(m.out, "educates %s is now active.\n", version)
 	}
 
 	return nil
@@ -165,7 +264,7 @@ func (m *Manager) createSymlink(source, target string) error {
 	// Check if source exists
 	if _, err := os.Stat(source); err != nil {
 		if os.IsNotExist(err) {
-			return fmt.Errorf("binary not found at %s", source)
+			return fmt.Errorf("binary not found at %s: %w", source, fs.ErrNotExist)
 		}
 		return fmt.Errorf("failed to check binary: %w", err)
 	}
@@ -195,32 +294,129 @@ func (m *Manager) createSymlink(source, target string) error {
 	return nil
 }
 
-// downloadFile downloads a file from a URL to a local path
-func (m *Manager) downloadFile(url, outPath string) error {
-	resp, err := http.Get(url)
+// releasedChecksum returns the SHA-256 checksum that the checksums.txt of
+// the release of version lists for assetName. When the release has no
+// checksums.txt, it warns that the download cannot be verified and returns
+// "".
+func (m *Manager) releasedChecksum(version, assetName, checksumsURL string) (string, error) {
+	if checksumsURL == "" {
+		_, _ = fmt.Fprintf(m.errOut, "Warning: release %s has no %s, so %s is installed without verifying its checksum.\n", version, github.ChecksumsAssetName, assetName)
+		return "", nil
+	}
+
+	var checksums bytes.Buffer
+	if err := m.download(checksumsURL, &checksums); err != nil {
+		return "", fmt.Errorf("failed to download %s (check your internet connection and try again): %w", github.ChecksumsAssetName, err)
+	}
+	sum, ok := findChecksum(checksums.String(), assetName)
+	if !ok {
+		return "", fmt.Errorf("%s has no entry for %s, so the binary cannot be verified as the one that was released", github.ChecksumsAssetName, assetName)
+	}
+	return sum, nil
+}
+
+// findChecksum returns the checksum that checksums, in the format sha256sum
+// writes, lists for name.
+func findChecksum(checksums, name string) (string, bool) {
+	for line := range strings.Lines(checksums) {
+		fields := strings.Fields(line)
+		if len(fields) == 2 && strings.TrimPrefix(fields[1], "*") == name {
+			return strings.ToLower(fields[0]), true
+		}
+	}
+	return "", false
+}
+
+// installBinary downloads the binary assetName from url into a temporary
+// file next to binaryPath, checks its SHA-256 checksum against releasedSum
+// unless releasedSum is empty, makes it executable and only then renames it
+// to binaryPath, replacing any binary already there. The temporary file is
+// removed when any step fails, so binaryPath holds either the previous
+// binary or the complete, verified new one.
+func (m *Manager) installBinary(assetName, url, releasedSum, binaryPath string) (err error) {
+	dir := filepath.Dir(binaryPath)
+	// The leading dot keeps the temporary file out of the installed versions.
+	tmp, err := os.CreateTemp(dir, "."+filepath.Base(binaryPath)+"-*.download")
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create a temporary file in %s: %w", dir, err)
 	}
 	defer func() {
-		if cerr := resp.Body.Close(); cerr != nil && err == nil {
-			err = fmt.Errorf("error closing response body: %w", cerr)
+		_ = tmp.Close()
+		if err != nil {
+			_ = os.Remove(tmp.Name())
 		}
 	}()
 
-	if resp.StatusCode != 200 {
-		return fmt.Errorf("failed to download file: %s", resp.Status)
+	_, _ = fmt.Fprintf(m.out, "Downloading %s...\n", url)
+	hash := sha256.New()
+	if err := m.download(url, io.MultiWriter(tmp, hash)); err != nil {
+		return fmt.Errorf("failed to download binary (check your internet connection and try again): %w", err)
 	}
 
-	out, err := os.Create(outPath)
+	if releasedSum != "" {
+		if sum := hex.EncodeToString(hash.Sum(nil)); sum != releasedSum {
+			return fmt.Errorf("checksum mismatch for %s: %s lists %s, but the download has %s", assetName, github.ChecksumsAssetName, releasedSum, sum)
+		}
+		_, _ = fmt.Fprintf(m.out, "Checksum verified against %s.\n", github.ChecksumsAssetName)
+	}
+
+	if err := tmp.Chmod(0o755); err != nil {
+		return fmt.Errorf("failed to set executable permissions on %s: %w", tmp.Name(), err)
+	}
+	if err := tmp.Sync(); err != nil {
+		return fmt.Errorf("failed to write %s: %w", tmp.Name(), err)
+	}
+	if err := tmp.Close(); err != nil {
+		return fmt.Errorf("failed to write %s: %w", tmp.Name(), err)
+	}
+	if err := os.Rename(tmp.Name(), binaryPath); err != nil {
+		return fmt.Errorf("failed to move the downloaded binary to %s: %w", binaryPath, err)
+	}
+	return nil
+}
+
+// download writes the body of a GET of url to w. It fails when the body
+// stalls: when a read waits longer than the download idle timeout for data.
+func (m *Manager) download(url string, w io.Writer) error {
+	ctx, cancel := context.WithCancelCause(context.Background())
+	defer cancel(nil)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return err
 	}
-	defer func() {
-		if cerr := out.Close(); cerr != nil && err == nil {
-			err = fmt.Errorf("error closing output file: %w", cerr)
-		}
-	}()
+	resp, err := m.http.Do(req)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = resp.Body.Close() }()
 
-	_, err = io.Copy(out, resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("GET %s: %s", url, resp.Status)
+	}
+
+	seconds := strconv.FormatFloat(m.downloadIdleTimeout.Seconds(), 'f', -1, 64)
+	stalled := fmt.Errorf("download stalled: no data arrived for %s seconds", seconds)
+	timer := time.AfterFunc(m.downloadIdleTimeout, func() { cancel(stalled) })
+	defer timer.Stop()
+
+	_, err = io.Copy(w, &idleTimeoutReader{r: resp.Body, timeout: m.downloadIdleTimeout, timer: timer})
+	if err != nil && errors.Is(context.Cause(ctx), stalled) {
+		return stalled
+	}
 	return err
+}
+
+// idleTimeoutReader reads from r, and runs timer's function when a read
+// waits longer than timeout for data.
+type idleTimeoutReader struct {
+	r       io.Reader
+	timeout time.Duration
+	timer   *time.Timer
+}
+
+func (r *idleTimeoutReader) Read(p []byte) (int, error) {
+	r.timer.Reset(r.timeout)
+	defer r.timer.Stop()
+	return r.r.Read(p)
 }

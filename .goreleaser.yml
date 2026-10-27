@@ -5,7 +5,7 @@ version: 2
 builds:
   - main: ./cmd/educatesenv
     id: educatesenv
-    binary: educatesenv-{{ .Os }}-{{ .Arch }}
+    binary: educatesenv
     env:
       - CGO_ENABLED=0
     goos:
@@ -22,6 +22,9 @@ builds:
 archives:
   - formats:
       - binary
+    # Release assets are named educatesenv-<os>-<arch>, as the download
+    # instructions in the release notes header expect.
+    name_template: "{{ .ProjectName }}-{{ .Os }}-{{ .Arch }}"
 
 checksum:
   name_template: 'checksums.txt'
@@ -44,6 +47,12 @@ release:
   # If set to true, will not auto-publish the release.
   # We wait so that we don't make the release public until we have notarize email from Apple.
   draft: true
+
+  # Delete a draft release with the same name, the tag, before creating the
+  # release. A run that fails while uploading leaves a draft behind, and
+  # GitHub's lookup by tag never finds drafts, so without this a rerun would
+  # leave two drafts for the same tag.
+  replace_existing_draft: true
 
   # What to do with the release notes in case there the release already exists.
   #
@@ -104,9 +113,17 @@ notarize:
   macos:
     - # Whether this configuration is enabled or not.
       #
+      # MACOS_SIGNING switches signing and notarization, the same way for
+      # goreleaser release and goreleaser build. A release signs unless
+      # MACOS_SIGNING is false, so it fails when MACOS_SIGN_P12 is empty or
+      # missing, as well as when signing fails. A snapshot signs only when
+      # MACOS_SIGNING is true, so that snapshots build without the
+      # certificate. The release workflow sets MACOS_SIGNING from its
+      # skip-signing input.
+      #
       # Default: false.
       # Templates: allowed.
-      enabled: '{{ isEnvSet "MACOS_SIGN_P12" }}'
+      enabled: '{{ if .IsSnapshot }}{{ eq (tolower (trim (envOrDefault "MACOS_SIGNING" "false"))) "true" }}{{ else }}{{ ne (tolower (trim (envOrDefault "MACOS_SIGNING" "true"))) "false" }}{{ end }}'
 
       # Before notarizing, we need to sign the binary.
       # This block defines the configuration for doing so.
