@@ -21,10 +21,11 @@ jobs:
     name: Create Release
     runs-on: ubuntu-latest
     env:
-      # false for a manual run with skip-signing, true otherwise. The secrets
+      # false for a manual run with skip-signing, or for any run while the
+      # MACOS_SIGNING repository variable is false; true otherwise. The secrets
       # check below and .goreleaser.yml both read it to decide whether to sign
       # and notarize the macOS binaries.
-      MACOS_SIGNING: ${{ (github.event_name == 'workflow_dispatch' && inputs.skip-signing) && 'false' || 'true' }}
+      MACOS_SIGNING: ${{ ((github.event_name == 'workflow_dispatch' && inputs.skip-signing) || vars.MACOS_SIGNING == 'false') && 'false' || 'true' }}
     permissions:
       contents: write
       # packages: write
@@ -35,6 +36,10 @@ jobs:
     # Every release signs and notarizes the macOS binaries unless MACOS_SIGNING
     # is false. Without this check, an empty notary secret would make
     # GoReleaser sign the binaries, skip notarization and still succeed.
+    - name: Report a release without macOS signing
+      if: env.MACOS_SIGNING == 'false'
+      run: echo "::warning::This release does not sign or notarize the macOS binaries, because the skip-signing input is set or the MACOS_SIGNING repository variable is false."
+
     - name: Check the macOS signing and notarization secrets
       if: env.MACOS_SIGNING != 'false'
       env:

@@ -479,7 +479,9 @@ repository secrets:
 | `MACOS_NOTARY_ISSUER_ID` | the issuer UUID of the `.p8` key |
 
 Every release signs and notarizes the macOS binaries, except a manual run
-with the `skip-signing` input described below. Its first step checks the
+with the `skip-signing` input and any run while the `MACOS_SIGNING`
+repository variable is `false`, both described below. Its first step
+checks the
 five secrets and fails, naming the ones that are empty or missing. The
 run also fails when signing fails or when the notarization submission
 fails. GoReleaser signs and notarizes before it creates the draft
@@ -495,7 +497,8 @@ only when it is `true`. So `goreleaser release --snapshot --clean` builds
 without the certificate, and
 `MACOS_SIGNING=true goreleaser release --snapshot --clean` tests signing
 with it. The release workflow sets it to `false` for a manual run with
-`skip-signing`, and to `true` for every other run.
+`skip-signing` or while the `MACOS_SIGNING` repository variable is
+`false`, and to `true` for every other run.
 
 ### Publishing the draft
 
@@ -522,6 +525,21 @@ notarization email to wait for, so publish the draft once its notes are
 ready, and point macOS users who download in a browser to the quarantine
 note under [Installation](#macos-and-the-quarantine-attribute). Only the
 manual trigger offers `skip-signing`.
+
+To leave signing off for every release, tag pushes included, until the
+membership or the certificate is back, set the `MACOS_SIGNING` repository
+variable to `false`:
+
+```sh
+gh variable set MACOS_SIGNING --body false --repo educates/educatesenv
+```
+
+Every run then releases unsigned and adds a warning to its summary
+saying so. Delete the variable to sign again:
+
+```sh
+gh variable delete MACOS_SIGNING --repo educates/educatesenv
+```
 
 ## Contributing
 
