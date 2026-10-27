@@ -486,9 +486,15 @@ fails. GoReleaser signs and notarizes before it creates the draft
 release, so a failed run leaves the tag but no release behind, and a
 manual run with `skip-signing` can release that tag. A run that fails
 later, while uploading, leaves a draft, which the next run for the same
-tag deletes and creates again. A snapshot build,
-such as `goreleaser release --snapshot --clean`, signs only when
-`MACOS_SIGN_P12` is set, so it builds without the certificate.
+tag deletes and creates again.
+
+The `MACOS_SIGNING` environment variable switches signing and
+notarization, for `goreleaser release` and `goreleaser build` alike. A
+release signs unless `MACOS_SIGNING` is `false`, and a snapshot signs
+only when it is `true`. So `goreleaser release --snapshot --clean` builds
+without the certificate, and
+`MACOS_SIGNING=true goreleaser release --snapshot --clean` tests signing
+with it.
 
 ### Publishing the draft
 
